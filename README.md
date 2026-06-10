@@ -57,6 +57,32 @@ GitHubリポジトリ箱では、`GitHubから取得` で `001yukiapp` の公開
 5. `Save` を押す
 6. 数分後に `https://001yukiapp.github.io/project/` を開いて確認する
 
+## GitHubへpushする手順
+
+PowerShellでリポジトリ直下に移動して、`push.ps1` を実行します。
+
+```powershell
+.\push.ps1 "Update project control UI"
+```
+
+コミットメッセージを省略した場合は `"Update project"` が使われます。
+
+`push.ps1` は以下を順番に実行します。
+
+1. `git add -A`
+2. 変更がある場合だけ `git commit`
+3. `git fetch origin main`
+4. `git pull --rebase origin main`
+5. `git push origin main`
+
+今後Codexに依頼するときは、次のように書くとpushまで進めやすいです。
+
+```text
+変更後、.\push.ps1 "Update project" を実行してGitHubへpushまで完了してください。失敗した場合は、エラー内容をそのまま報告してください。
+```
+
+通常は `git push --force` や `--force-with-lease` は使いません。競合が出た場合は無理に解決せず、止めて内容を確認してください。GitHubトークンやパスワードはコードに書かないでください。
+
 ## ファイル構成
 
 ```text
@@ -67,6 +93,7 @@ manifest.webmanifest
 icon.svg
 sw.js
 README.md
+push.ps1
 ```
 
 アプリ本体はリポジトリ直下で動く構成です。CSS、JavaScript、manifest、Service Workerは相対パスで参照しているため、GitHub Pagesの `/project/` 配下でも動く想定です。
