@@ -84,6 +84,49 @@ h2 { margin: 0; font-size: 18px; }
 .summary-card span { display: block; font-size: 24px; font-weight: 800; }
 .summary-card small { color: var(--muted); font-size: 11px; }
 
+.focus-card {
+  border-color: rgba(34,197,94,.36);
+  background: linear-gradient(135deg, rgba(34,197,94,.18), rgba(59,130,246,.10)), rgba(18,26,45,.9);
+}
+
+.focus-label {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  background: rgba(34,197,94,.18);
+  color: #bbf7d0;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.focus-card h2 {
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.focus-note {
+  color: var(--text);
+  line-height: 1.5;
+  margin: 10px 0;
+}
+
+.focus-metrics {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.focus-metrics span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .panel {
   background: rgba(18, 26, 45, .84);
   border: 1px solid var(--line);
@@ -280,8 +323,119 @@ input:focus, textarea:focus, select:focus {
   margin: 10px 0 14px;
 }
 
-.filter { font-size: 13px; color: var(--muted); }
-.filter.active { background: var(--text); color: #111827; font-weight: 800; }
+.filter, .tree-filter { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.filter.active, .tree-filter.active { background: var(--text); color: #111827; font-weight: 800; }
+
+.project-tree,
+.phase-list,
+.tree-task-list,
+.repo-list {
+  display: grid;
+  gap: 12px;
+}
+
+.tree-project,
+.repo-card {
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 13px;
+}
+
+.tree-project-head,
+.tree-phase-head {
+  width: 100%;
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  padding: 10px;
+  text-align: left;
+  background: rgba(255,255,255,.04);
+}
+
+.tree-phase-head {
+  align-items: center;
+  margin-top: 10px;
+}
+
+.tree-title,
+.repo-name {
+  margin: 0 0 5px;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.tree-sub,
+.repo-desc,
+.repo-next {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tree-stats,
+.repo-meta,
+.repo-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tree-toggle {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.phase-progress { margin: 8px 0; }
+
+.tree-task {
+  border-left: 2px solid var(--line);
+  padding: 10px 10px 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+}
+
+.tree-task.done { opacity: .56; }
+.tree-task.focus-task { border-left-color: var(--accent2); background: rgba(34,197,94,.08); }
+.tree-task.blocked-task { border-left-color: var(--danger); background: rgba(239,68,68,.08); }
+
+.tree-check {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: start;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tree-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #22c55e;
+}
+
+.badge.focus { color: #bbf7d0; background: rgba(34,197,94,.14); }
+.badge.blocked { color: #fecaca; background: rgba(239,68,68,.16); }
+
+.repo-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.repo-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
 
 .task-list { display: grid; gap: 10px; }
 
@@ -488,6 +642,22 @@ menu {
   .summary-card { padding: 12px 10px; }
   .summary-card span { font-size: 20px; }
   .grid2 { grid-template-columns: 1fr; }
+  .panel { padding: 13px; border-radius: 18px; }
+  .focus-card h2 { font-size: 20px; }
+  .tree-project-head,
+  .tree-phase-head,
+  .repo-head {
+    display: grid;
+  }
+  .tree-stats,
+  .repo-meta {
+    justify-content: flex-start;
+  }
+  .task-actions button,
+  .idea-actions button,
+  .repo-actions button {
+    min-height: 38px;
+  }
   .app { padding-bottom: 92px; }
   .quick-idea-btn {
     right: max(12px, env(safe-area-inset-right));

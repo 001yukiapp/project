@@ -1,5 +1,5 @@
 const STORAGE_KEY = "project-control-mini-v2";
-const DATA_VERSION = 5;
+const DATA_VERSION = 6;
 
 function task(id, title, note = "", priority = "mid") {
   return { id, title, note, status: "todo", priority, due: "" };
@@ -9,8 +9,38 @@ const defaultState = {
   dataVersion: DATA_VERSION,
   selectedProjectId: "p-photo",
   filter: "all",
+  treeFilter: "all",
   memo: "",
   ideas: [],
+  repositories: [
+    {
+      id: "repo-001yukiapp-project",
+      name: "project",
+      fullName: "001yukiapp/project",
+      url: "https://github.com/001yukiapp/project",
+      htmlUrl: "https://github.com/001yukiapp/project",
+      description: "プロジェクト進捗管理PWA。GitHub Pagesで公開中。",
+      defaultBranch: "main",
+      createdAt: "",
+      updatedAt: "",
+      pushedAt: "",
+      language: "JavaScript",
+      homepage: "https://001yukiapp.github.io/project/",
+      visibility: "public",
+      projectId: "uncategorized",
+      projectName: "Project Control Mini",
+      phaseId: "uncategorized",
+      phaseTitle: "未分類",
+      status: "active",
+      type: "pwa",
+      priority: "high",
+      nextAction: "写真図鑑、工具ナビ、アイデア箱、リポジトリ管理、ツリーUIを追加して運用しやすくする",
+      codexPrompt: "",
+      memo: "公開URLは https://001yukiapp.github.io/project/",
+      lastSyncedAt: ""
+    }
+  ],
+  ui: { openProjects: {}, openPhases: {} },
   projects: [
     {
       id: "p-photo",
@@ -254,6 +284,7 @@ const defaultState = {
 let state = load();
 let editingTaskId = null;
 let editingIdeaId = null;
+let editingRepoId = null;
 let ideaSaveMode = "close";
 
 const $ = (id) => document.getElementById(id);
@@ -330,8 +361,24 @@ function migrateState(savedState) {
     dataVersion: DATA_VERSION,
     selectedProjectId,
     projects: [...migratedProjects, ...customProjects],
-    ideas: Array.isArray(savedState.ideas) ? savedState.ideas : []
+    ideas: Array.isArray(savedState.ideas) ? savedState.ideas : [],
+    repositories: mergeRepositories(base.repositories, savedState.repositories || []),
+    ui: {
+      openProjects: savedState.ui?.openProjects || {},
+      openPhases: savedState.ui?.openPhases || {}
+    }
   };
+}
+
+function mergeRepositories(defaultRepos, savedRepos) {
+  const savedByFullName = new Map(savedRepos.filter(r => r?.fullName).map(r => [r.fullName.toLowerCase(), r]));
+  const merged = defaultRepos.map(defaultRepo => {
+    const savedRepo = savedByFullName.get(defaultRepo.fullName.toLowerCase());
+    return savedRepo ? { ...defaultRepo, ...savedRepo, description: savedRepo.description || defaultRepo.description } : defaultRepo;
+  });
+  const defaultNames = new Set(defaultRepos.map(r => r.fullName.toLowerCase()));
+  const custom = savedRepos.filter(r => r?.fullName && !defaultNames.has(r.fullName.toLowerCase()));
+  return [...merged, ...custom];
 }
 
 function mergeTasks(defaultTasks, savedTasks) {
@@ -358,10 +405,104 @@ function mergeTasks(defaultTasks, savedTasks) {
   return [...merged, ...customTasks];
 }
 
+function inferPhase(task, index = 0) {
+  const title = task?.title || "";
+  const match = title.match(/^(Phase\s+[0-9X.]+|将来フェーズ):\s*([^:：]+?)(?:を|の|$)/);
+  const explicit = title.match(/^(Phase\s+[0-9X.]+):\s*/);
+  if (explicit) {
+    const label = explicit[1];
+    return {
+      phaseId: slugify(label),
+      phaseTitle: phaseTitleFromLabel(label),
+      phaseOrder: phaseOrderFromLabel(label)
+    };
+  }
+  if (title.startsWith("将来フェーズ:")) {
+    return { phaseId: "future", phaseTitle: "将来フェーズ", phaseOrder: 99 };
+  }
+  if (task?.phaseTitle) {
+    return {
+      phaseId: task.phaseId || slugify(task.phaseTitle),
+      phaseTitle: task.phaseTitle,
+      phaseOrder: Number.isFinite(Number(task.phaseOrder)) ? Number(task.phaseOrder) : index
+    };
+  }
+  return { phaseId: "uncategorized", phaseTitle: "未分類", phaseOrder: 999 };
+}
+
+function phaseTitleFromLabel(label) {
+  const map = {
+    "Phase 0": "Phase 0: コンセプト固定",
+    "Phase 1": "Phase 1: リサーチ",
+    "Phase 1.5": "Phase 1.5: Gotcha競合分析",
+    "Phase 2": "Phase 2: MVP仕様",
+    "Phase 3": "Phase 3: 画面モック",
+    "Phase 4": "Phase 4: 最小実装 / MVPサイト",
+    "Phase 5": "Phase 5: 差別化演出設計 / コンテンツ化",
+    "Phase 6": "Phase 6: 検証 / 集客",
+    "Phase 7": "Phase 7: 集客 / マネタイズ",
+    "Phase 8": "Phase 8: マネタイズ / 安全・法務",
+    "Phase 9": "Phase 9: リリース準備 / 改善",
+    "Phase 10": "Phase 10: 改善",
+    "Phase X": "Phase X: 差別化演出設計"
+  };
+  return map[label] || label;
+}
+
+function phaseOrderFromLabel(label) {
+  if (label === "Phase X") return 50;
+  const n = Number(label.replace("Phase ", ""));
+  return Number.isFinite(n) ? n : 999;
+}
+
+function slugify(value = "") {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "uncategorized";
+}
+
+function phaseNameFor(projectId, phaseId, fallback = "", projects = state?.projects || []) {
+  if (!phaseId || phaseId === "uncategorized") return "未分類";
+  const project = projects.find(p => p.id === projectId);
+  return project?.tasks?.find(t => t.phaseId === phaseId)?.phaseTitle || fallback || "未分類";
+}
+
+function normalizeRepository(repo, projects = state?.projects || []) {
+  repo.id ||= makeId();
+  repo.name ||= repo.fullName?.split("/").pop() || "repository";
+  repo.fullName ||= parseRepoFullName(repo.url || repo.htmlUrl || repo.name) || repo.name;
+  repo.url ||= repo.htmlUrl || `https://github.com/${repo.fullName}`;
+  repo.htmlUrl ||= repo.url;
+  repo.description ||= "";
+  repo.defaultBranch ||= "main";
+  repo.createdAt ||= "";
+  repo.updatedAt ||= "";
+  repo.pushedAt ||= "";
+  repo.language ||= "";
+  repo.homepage ||= "";
+  repo.visibility ||= "public";
+  repo.projectId ||= "uncategorized";
+  repo.projectName = repo.projectId === "uncategorized"
+    ? (repo.projectName || "未分類")
+    : (projects.find(p => p.id === repo.projectId)?.name || repo.projectName || "未分類");
+  repo.phaseId ||= "uncategorized";
+  repo.phaseTitle ||= phaseNameFor(repo.projectId, repo.phaseId, repo.phaseTitle, projects);
+  repo.status ||= "idea";
+  repo.type ||= "other";
+  repo.priority ||= "mid";
+  repo.nextAction ||= "";
+  repo.codexPrompt ||= "";
+  repo.memo ||= "";
+  repo.lastSyncedAt ||= "";
+  return repo;
+}
+
 function normalizeState(s) {
   const d = structuredClone(defaultState);
   const merged = { ...d, ...s };
   merged.dataVersion = DATA_VERSION;
+  merged.treeFilter ||= "all";
+  merged.ui ||= { openProjects: {}, openPhases: {} };
+  merged.ui.openProjects ||= {};
+  merged.ui.openPhases ||= {};
   if (!Array.isArray(merged.projects)) merged.projects = d.projects;
   merged.projects.forEach(p => {
     p.id ||= makeId();
@@ -372,13 +513,25 @@ function normalizeState(s) {
     p.costLimit ||= "";
     p.link ||= "";
     if (!Array.isArray(p.tasks)) p.tasks = [];
-    p.tasks.forEach(t => {
+    p.tasks.forEach((t, index) => {
       t.id ||= makeId();
       t.title ||= "無題タスク";
       t.status ||= "todo";
       t.priority ||= "mid";
+      if (t.status === "blocked") {
+        t.status = "todo";
+        t.isBlocked = true;
+      }
       t.note ||= "";
       t.due ||= "";
+      const phase = inferPhase(t, index);
+      t.phaseId ||= phase.phaseId;
+      t.phaseTitle ||= phase.phaseTitle;
+      t.phaseOrder = Number.isFinite(Number(t.phaseOrder)) ? Number(t.phaseOrder) : phase.phaseOrder;
+      t.taskOrder = Number.isFinite(Number(t.taskOrder)) ? Number(t.taskOrder) : index;
+      t.isBlocked = Boolean(t.isBlocked);
+      t.focus = Boolean(t.focus);
+      t.importance ||= t.priority;
     });
   });
   if (!Array.isArray(merged.ideas)) merged.ideas = [];
@@ -390,11 +543,16 @@ function normalizeState(s) {
     idea.projectName = idea.projectId === "uncategorized"
       ? "未分類"
       : (merged.projects.find(p => p.id === idea.projectId)?.name || idea.projectName || "未分類");
+    idea.phaseId ||= "uncategorized";
+    idea.phaseTitle ||= phaseNameFor(idea.projectId, idea.phaseId, idea.phaseTitle, merged.projects);
     idea.priority ||= "mid";
     idea.status ||= "inbox";
     idea.createdAt ||= new Date().toISOString();
     idea.updatedAt ||= idea.createdAt;
   });
+  if (!Array.isArray(merged.repositories)) merged.repositories = d.repositories;
+  merged.repositories = mergeRepositories(d.repositories, merged.repositories);
+  merged.repositories.forEach(repo => normalizeRepository(repo, merged.projects));
   return merged;
 }
 
@@ -411,18 +569,17 @@ function render() {
   if (!currentProject() && state.projects.length) state.selectedProjectId = state.projects[0].id;
 
   renderSummary();
-  renderProgressBoard();
-  renderTabs();
-  renderProjectEditor();
-  renderTasks();
+  renderFocusArea();
+  renderProjectTree();
   renderIdeas();
+  renderRepositories();
 
   $("globalMemo").value = state.memo || "";
   updateChatGPTPayload();
 }
 
 function allTasks() {
-  return state.projects.flatMap(p => (p.tasks || []).map(t => ({...t, projectName: p.name})));
+  return state.projects.flatMap(p => (p.tasks || []).map(t => ({...t, projectId: p.id, projectName: p.name, projectStatus: p.status, projectNextAction: p.nextAction})));
 }
 
 function renderSummary() {
@@ -439,6 +596,164 @@ function projectRate(project) {
   const tasks = project.tasks || [];
   const done = tasks.filter(t => t.status === "done").length;
   return tasks.length ? Math.round(done / tasks.length * 100) : 0;
+}
+
+function renderFocusArea() {
+  const focus = pickFocusTask();
+  const tasks = allTasks();
+  const highCount = tasks.filter(t => t.status !== "done" && t.priority === "high").length;
+  const blockedCount = tasks.filter(t => t.status !== "done" && t.isBlocked).length;
+  const done = tasks.filter(t => t.status === "done").length;
+  const rate = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+  const el = $("focusArea");
+  if (!el) return;
+  if (!focus) {
+    el.innerHTML = `<section class="panel focus-card"><span class="focus-label">今日やる</span><h2>未完了タスクなし</h2><p class="hint">新しいアイデアやタスクを追加しよう。</p></section>`;
+    return;
+  }
+  el.innerHTML = `
+    <section class="panel focus-card">
+      <span class="focus-label">今日やる</span>
+      <p class="eyebrow">${escapeHtml(focus.projectName)}</p>
+      <h2>${escapeHtml(displayTaskTitle(focus))}</h2>
+      ${focus.note ? `<p class="focus-note">${escapeHtml(focus.note)}</p>` : ""}
+      <div class="badges">
+        <span class="badge ${escapeAttr(focus.priority)}">${priorityLabel(focus.priority)}</span>
+        <span class="badge">${statusLabel(focus.status)}</span>
+        ${focus.isBlocked ? `<span class="badge blocked">詰まり中</span>` : ""}
+        <span class="badge">${escapeHtml(focus.phaseTitle || "未分類")}</span>
+      </div>
+      <p class="hint">次の一手: ${escapeHtml(focus.projectNextAction || "このタスクを一つ進める")}</p>
+      <div class="focus-metrics">
+        <span>高優先度 ${highCount}</span>
+        <span>詰まり中 ${blockedCount}</span>
+        <span>全体進捗 ${rate}%</span>
+      </div>
+    </section>
+  `;
+}
+
+function pickFocusTask() {
+  const open = allTasks().filter(t => t.status !== "done");
+  const sortProject = (a, b) => Number((b.projectStatus || "").includes("最優先")) - Number((a.projectStatus || "").includes("最優先"));
+  return [...open].filter(t => t.focus).sort(sortProject)[0]
+    || [...open].filter(t => t.status === "doing").sort(sortProject)[0]
+    || [...open].filter(t => t.priority === "high").sort(sortProject)[0]
+    || [...open].sort(sortProject)[0]
+    || null;
+}
+
+function renderProjectTree() {
+  const root = $("projectTree");
+  if (!root) return;
+  root.innerHTML = state.projects.map(project => renderProjectNode(project)).join("");
+}
+
+function renderProjectNode(project) {
+  const tasks = project.tasks || [];
+  const openTasks = tasks.filter(t => t.status !== "done");
+  const high = openTasks.filter(t => t.priority === "high").length;
+  const blocked = openTasks.filter(t => t.isBlocked).length;
+  const projectOpen = state.ui.openProjects[project.id] !== false;
+  const phases = groupTasksByPhase(project).filter(phase => phase.tasks.some(taskMatchesTreeFilter));
+  return `
+    <article class="tree-project">
+      <button class="tree-project-head" onclick="toggleProjectOpen('${project.id}')">
+        <div>
+          <p class="tree-title">${escapeHtml(project.name)}</p>
+          <p class="tree-sub">${escapeHtml(project.nextAction || project.mission || "")}</p>
+        </div>
+        <div class="tree-stats">
+          <span class="badge">${escapeHtml(project.status || "未設定")}</span>
+          <span class="badge">${projectRate(project)}%</span>
+          <span class="badge">未完了 ${openTasks.length}</span>
+          <span class="badge high">高 ${high}</span>
+          <span class="badge blocked">詰まり ${blocked}</span>
+          <span class="tree-toggle">${projectOpen ? "閉じる" : "開く"}</span>
+        </div>
+      </button>
+      <div class="progressbar"><span style="width:${projectRate(project)}%"></span></div>
+      ${projectOpen ? `<div class="phase-list">${phases.map(phase => renderPhaseNode(project, phase)).join("") || `<p class="empty">条件に合うタスクなし</p>`}</div>` : ""}
+    </article>
+  `;
+}
+
+function renderPhaseNode(project, phase) {
+  const phaseKey = `${project.id}:${phase.phaseId}`;
+  const phaseOpen = state.ui.openPhases[phaseKey] !== false;
+  const visibleTasks = phase.tasks.filter(taskMatchesTreeFilter);
+  const done = phase.tasks.filter(t => t.status === "done").length;
+  const rate = phase.tasks.length ? Math.round(done / phase.tasks.length * 100) : 0;
+  const openCount = phase.tasks.length - done;
+  return `
+    <section class="tree-phase">
+      <button class="tree-phase-head" onclick="togglePhaseOpen('${project.id}', '${phase.phaseId}')">
+        <span>${escapeHtml(phase.phaseTitle)}</span>
+        <span class="badge">${rate}%</span>
+        <span class="badge">未完了 ${openCount}</span>
+        <span class="tree-toggle">${phaseOpen ? "閉じる" : "開く"}</span>
+      </button>
+      <div class="progressbar phase-progress"><span style="width:${rate}%"></span></div>
+      ${phaseOpen ? `<div class="tree-task-list">${visibleTasks.map(t => renderTreeTask(project, t)).join("")}</div>` : ""}
+    </section>
+  `;
+}
+
+function renderTreeTask(project, task) {
+  return `
+    <article class="tree-task ${task.focus ? "focus-task" : ""} ${task.isBlocked ? "blocked-task" : ""} ${task.status === "done" ? "done" : ""}">
+      <label class="tree-check">
+        <input type="checkbox" ${task.status === "done" ? "checked" : ""} onchange="toggleTaskDone('${project.id}', '${task.id}', this.checked)" />
+        <span>${escapeHtml(displayTaskTitle(task))}</span>
+      </label>
+      <div class="badges">
+        <span class="badge ${escapeAttr(task.priority)}">${priorityLabel(task.priority)}</span>
+        <span class="badge">${statusLabel(task.status)}</span>
+        ${task.due ? `<span class="badge">期限 ${escapeHtml(task.due)}</span>` : ""}
+        ${task.focus ? `<span class="badge focus">今日やる</span>` : ""}
+        ${task.isBlocked ? `<span class="badge blocked">詰まり中</span>` : ""}
+      </div>
+      ${task.note ? `<p class="task-note">${escapeHtml(task.note)}</p>` : ""}
+      <div class="task-actions">
+        <button onclick="setTaskStatus('${task.id}', 'todo', '${project.id}')">未着手</button>
+        <button onclick="setTaskStatus('${task.id}', 'doing', '${project.id}')">作業中</button>
+        <button onclick="setTaskStatus('${task.id}', 'done', '${project.id}')">完了</button>
+        <button onclick="setTaskFocus('${project.id}', '${task.id}')" class="ghost">${task.focus ? "今日やる解除" : "今日やる"}</button>
+        <button onclick="toggleTaskBlocked('${project.id}', '${task.id}')" class="ghost">${task.isBlocked ? "詰まり解除" : "詰まり中"}</button>
+        <button onclick="editTask('${task.id}', '${project.id}')" class="ghost">編集</button>
+        <button onclick="deleteTask('${task.id}', '${project.id}')" class="danger">削除</button>
+      </div>
+    </article>
+  `;
+}
+
+function groupTasksByPhase(project) {
+  const map = new Map();
+  (project.tasks || []).forEach((task, index) => {
+    const phase = inferPhase(task, index);
+    task.phaseId ||= phase.phaseId;
+    task.phaseTitle ||= phase.phaseTitle;
+    task.phaseOrder = Number.isFinite(Number(task.phaseOrder)) ? Number(task.phaseOrder) : phase.phaseOrder;
+    const key = task.phaseId;
+    if (!map.has(key)) map.set(key, { phaseId: key, phaseTitle: task.phaseTitle, phaseOrder: task.phaseOrder, tasks: [] });
+    map.get(key).tasks.push(task);
+  });
+  return [...map.values()]
+    .sort((a, b) => a.phaseOrder - b.phaseOrder || a.phaseTitle.localeCompare(b.phaseTitle, "ja"))
+    .map(phase => ({ ...phase, tasks: phase.tasks.sort((a, b) => (a.taskOrder ?? 0) - (b.taskOrder ?? 0)) }));
+}
+
+function taskMatchesTreeFilter(task) {
+  const filter = state.treeFilter || "all";
+  if (filter === "open") return task.status !== "done";
+  if (filter === "high") return task.status !== "done" && task.priority === "high";
+  if (filter === "focus") return task.status !== "done" && task.focus;
+  if (filter === "blocked") return task.status !== "done" && task.isBlocked;
+  return true;
+}
+
+function displayTaskTitle(task) {
+  return String(task.title || "").replace(/^Phase\s+[0-9X.]+:\s*/, "").replace(/^将来フェーズ:\s*/, "");
 }
 
 function renderProgressBoard() {
@@ -630,6 +945,7 @@ function renderIdeas() {
       <p class="idea-title">${escapeHtml(idea.title)}</p>
       <div class="idea-meta">
         <span class="badge">${escapeHtml(projectNameForIdea(idea.projectId, idea.projectName))}</span>
+        <span class="badge">${escapeHtml(idea.phaseTitle || "未分類")}</span>
         <span class="badge ${escapeAttr(idea.priority)}">${priorityLabel(idea.priority)}</span>
         <span class="badge">${idea.status === "converted" ? "タスク化済み" : "未タスク化"}</span>
         <span class="badge">${formatDateTime(idea.createdAt)}</span>
@@ -648,6 +964,7 @@ function openIdeaDialog(idea = null) {
   editingIdeaId = idea?.id || null;
   ideaSaveMode = "close";
   populateIdeaProjects(idea?.projectId || currentProject()?.id || "uncategorized");
+  populateIdeaPhases($("ideaProject").value, idea?.phaseId || "uncategorized");
   $("ideaDialogTitle").textContent = idea ? "アイデア編集" : "アイデア追加";
   $("ideaTitle").value = idea?.title || "";
   $("ideaNote").value = idea?.note || "";
@@ -667,6 +984,19 @@ function populateIdeaProjects(selectedId = "uncategorized") {
   if (!select.value) select.value = "uncategorized";
 }
 
+function populateIdeaPhases(projectId, selectedId = "uncategorized") {
+  const select = $("ideaPhase");
+  if (!select) return;
+  const project = state.projects.find(p => p.id === projectId);
+  const phases = project ? groupTasksByPhase(project) : [];
+  select.innerHTML = [
+    `<option value="uncategorized">未分類</option>`,
+    ...phases.map(phase => `<option value="${escapeAttr(phase.phaseId)}">${escapeHtml(phase.phaseTitle)}</option>`)
+  ].join("");
+  select.value = selectedId;
+  if (!select.value) select.value = "uncategorized";
+}
+
 function projectNameForIdea(projectId, fallback = "") {
   if (projectId === "uncategorized") return "未分類";
   return state?.projects?.find(p => p.id === projectId)?.name || fallback || "未分類";
@@ -678,11 +1008,14 @@ function saveIdea({ keepOpen = false } = {}) {
 
   const now = new Date().toISOString();
   const projectId = $("ideaProject").value || "uncategorized";
+  const phaseId = $("ideaPhase")?.value || "uncategorized";
   const data = {
     title,
     note: $("ideaNote").value.trim(),
     projectId,
     projectName: projectNameForIdea(projectId),
+    phaseId,
+    phaseTitle: phaseNameFor(projectId, phaseId),
     priority: $("ideaPriority").value,
     updatedAt: now
   };
@@ -741,6 +1074,13 @@ window.convertIdeaToTask = (id) => {
 
   const project = state.projects.find(p => p.id === projectId);
   if (!project) return;
+  let phaseId = idea.phaseId || "uncategorized";
+  let phaseTitle = idea.phaseTitle || "未分類";
+  if (phaseId === "uncategorized") {
+    const chosen = choosePhaseForProject(project);
+    phaseId = chosen.phaseId;
+    phaseTitle = chosen.phaseTitle;
+  }
 
   project.tasks.push({
     id: makeId(),
@@ -748,11 +1088,20 @@ window.convertIdeaToTask = (id) => {
     note: idea.note,
     status: "todo",
     priority: idea.priority,
-    due: ""
+    due: "",
+    phaseId,
+    phaseTitle,
+    phaseOrder: phaseId === "uncategorized" ? 999 : (groupTasksByPhase(project).find(p => p.phaseId === phaseId)?.phaseOrder ?? 500),
+    taskOrder: project.tasks.length,
+    isBlocked: false,
+    focus: false,
+    importance: idea.priority
   });
   idea.status = "converted";
   idea.projectId = project.id;
   idea.projectName = project.name;
+  idea.phaseId = phaseId;
+  idea.phaseTitle = phaseTitle;
   idea.updatedAt = new Date().toISOString();
   state.selectedProjectId = project.id;
   save();
@@ -766,6 +1115,16 @@ function chooseProjectForIdea() {
   if (!answer) return "";
   const index = Number(answer) - 1;
   return state.projects[index]?.id || "";
+}
+
+function choosePhaseForProject(project) {
+  const phases = groupTasksByPhase(project);
+  if (!phases.length) return { phaseId: "uncategorized", phaseTitle: "未分類" };
+  const lines = phases.map((p, index) => `${index + 1}: ${p.phaseTitle}`).join("\n");
+  const answer = prompt(`フェーズ番号を入力してください。未分類なら空でOK。\n${lines}`, "");
+  if (!answer) return { phaseId: "uncategorized", phaseTitle: "未分類" };
+  const phase = phases[Number(answer) - 1];
+  return phase ? { phaseId: phase.phaseId, phaseTitle: phase.phaseTitle } : { phaseId: "uncategorized", phaseTitle: "未分類" };
 }
 
 function showToast(message) {
@@ -784,6 +1143,274 @@ function formatDateTime(value) {
   return date.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function renderRepositories() {
+  const list = $("repoList");
+  if (!list) return;
+  const repos = [...(state.repositories || [])].sort((a, b) => new Date(b.pushedAt || b.updatedAt || 0) - new Date(a.pushedAt || a.updatedAt || 0));
+  if (!repos.length) {
+    list.innerHTML = `<p class="empty">リポジトリ未登録。GitHubから取得するか、手動で追加しよう。</p>`;
+    return;
+  }
+  list.innerHTML = repos.map(repo => `
+    <article class="repo-card">
+      <div class="repo-head">
+        <div>
+          <p class="repo-name">${escapeHtml(repo.fullName || repo.name)}</p>
+          <p class="repo-desc">${escapeHtml(repo.description || "説明なし")}</p>
+        </div>
+        <span class="badge ${escapeAttr(repo.priority)}">${priorityLabel(repo.priority)}</span>
+      </div>
+      <div class="repo-meta">
+        <span class="badge">${escapeHtml(repo.language || "言語不明")}</span>
+        <span class="badge">push ${formatDateTime(repo.pushedAt || repo.updatedAt)}</span>
+        <span class="badge">${escapeHtml(repo.projectName || "未分類")}</span>
+        <span class="badge">${escapeHtml(repo.phaseTitle || "未分類")}</span>
+        <span class="badge">${escapeHtml(repo.status)}</span>
+        <span class="badge">${escapeHtml(repo.type)}</span>
+      </div>
+      ${repo.nextAction ? `<p class="repo-next">次の一手: ${escapeHtml(repo.nextAction)}</p>` : ""}
+      ${repo.memo ? `<p class="repo-desc">${escapeHtml(repo.memo)}</p>` : ""}
+      <div class="repo-actions">
+        <button onclick="openRepo('${repo.id}')" class="ghost">GitHubを開く</button>
+        <button onclick="copyRepoPrompt('${repo.id}')" class="primary">Codex依頼文コピー</button>
+        <button onclick="editRepo('${repo.id}')" class="ghost">編集</button>
+        <button onclick="deleteRepo('${repo.id}')" class="danger">削除</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+async function fetchGithubRepos() {
+  const btn = $("fetchReposBtn");
+  const status = $("repoSyncStatus");
+  btn.disabled = true;
+  status.textContent = "取得中...";
+  try {
+    const res = await fetch("https://api.github.com/users/001yukiapp/repos?per_page=100&sort=updated");
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const repos = await res.json();
+    const before = new Set((state.repositories || []).map(r => r.fullName.toLowerCase()));
+    let added = 0;
+    let existing = 0;
+    repos.forEach(raw => {
+      const repo = repoFromGithub(raw);
+      const key = repo.fullName.toLowerCase();
+      const current = state.repositories.find(r => r.fullName.toLowerCase() === key);
+      if (current) {
+        Object.assign(current, {
+          name: current.name || repo.name,
+          url: current.url || repo.url,
+          htmlUrl: current.htmlUrl || repo.htmlUrl,
+          description: current.description || repo.description,
+          defaultBranch: repo.defaultBranch,
+          createdAt: repo.createdAt,
+          updatedAt: repo.updatedAt,
+          pushedAt: repo.pushedAt,
+          language: repo.language,
+          homepage: repo.homepage,
+          visibility: repo.visibility,
+          lastSyncedAt: repo.lastSyncedAt
+        });
+        existing += 1;
+      } else {
+        state.repositories.push(repo);
+        added += 1;
+      }
+    });
+    save();
+    render();
+    status.textContent = `${repos.length}件取得 / ${added}件追加 / ${existing}件既存`;
+    showToast("GitHub取得完了");
+  } catch (error) {
+    status.textContent = `取得失敗: ${error.message}`;
+  } finally {
+    setTimeout(() => { btn.disabled = false; }, 2500);
+  }
+}
+
+function repoFromGithub(raw) {
+  const inferred = inferRepositoryClassification(raw.name || raw.full_name || "");
+  return normalizeRepository({
+    id: `repo-${raw.full_name}`.replace(/[^a-zA-Z0-9_-]/g, "-"),
+    name: raw.name,
+    fullName: raw.full_name,
+    url: raw.html_url,
+    htmlUrl: raw.html_url,
+    description: raw.description || "",
+    defaultBranch: raw.default_branch || "main",
+    createdAt: raw.created_at || "",
+    updatedAt: raw.updated_at || "",
+    pushedAt: raw.pushed_at || "",
+    language: raw.language || "",
+    homepage: raw.homepage || "",
+    visibility: raw.visibility || "public",
+    ...inferred,
+    nextAction: inferred.nextAction || "",
+    codexPrompt: "",
+    memo: "",
+    lastSyncedAt: new Date().toISOString()
+  });
+}
+
+function inferRepositoryClassification(name = "") {
+  const lower = name.toLowerCase();
+  if (lower === "project") return {
+    projectId: "uncategorized",
+    projectName: "Project Control Mini",
+    phaseId: "uncategorized",
+    phaseTitle: "未分類",
+    status: "active",
+    type: "pwa",
+    priority: "high",
+    nextAction: "Project Control Miniを司令塔として運用しやすくする"
+  };
+  if (/(alignment|geo|maintenance|spring|rate|carapp)/.test(lower)) return repoClass("p-carapp", "active", "app", "high");
+  if (/(tool|3dp|print|jig)/.test(lower)) return repoClass("p-toolnav", "idea", "tool", "mid");
+  if (/(photo|animal|mikke|cat|zukan)/.test(lower)) return repoClass("p-photo", "idea", "app", "mid");
+  return { projectId: "uncategorized", projectName: "未分類", phaseId: "uncategorized", phaseTitle: "未分類", status: "idea", type: "other", priority: "mid" };
+}
+
+function repoClass(projectId, status, type, priority) {
+  const project = state.projects.find(p => p.id === projectId);
+  return { projectId, projectName: project?.name || "未分類", phaseId: "uncategorized", phaseTitle: "未分類", status, type, priority };
+}
+
+function openRepoDialog(repo = null) {
+  editingRepoId = repo?.id || null;
+  populateRepoProjects(repo?.projectId || "uncategorized");
+  populateRepoPhases($("repoProject").value, repo?.phaseId || "uncategorized");
+  $("repoDialogTitle").textContent = repo ? "リポジトリ編集" : "リポジトリ追加";
+  $("repoUrl").value = repo?.htmlUrl || repo?.url || "";
+  $("repoName").value = repo?.name || "";
+  $("repoDescription").value = repo?.description || "";
+  $("repoStatus").value = repo?.status || "idea";
+  $("repoType").value = repo?.type || "other";
+  $("repoPriority").value = repo?.priority || "mid";
+  $("repoNextAction").value = repo?.nextAction || "";
+  $("repoCodexPrompt").value = repo?.codexPrompt || "";
+  $("repoMemo").value = repo?.memo || "";
+  $("repoDialog").showModal();
+}
+
+function populateRepoProjects(selectedId = "uncategorized") {
+  const select = $("repoProject");
+  select.innerHTML = [
+    ...state.projects.map(p => `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`),
+    `<option value="uncategorized">未分類</option>`
+  ].join("");
+  select.value = selectedId;
+  if (!select.value) select.value = "uncategorized";
+}
+
+function populateRepoPhases(projectId, selectedId = "uncategorized") {
+  const select = $("repoPhase");
+  const project = state.projects.find(p => p.id === projectId);
+  const phases = project ? groupTasksByPhase(project) : [];
+  select.innerHTML = [
+    `<option value="uncategorized">未分類</option>`,
+    ...phases.map(phase => `<option value="${escapeAttr(phase.phaseId)}">${escapeHtml(phase.phaseTitle)}</option>`)
+  ].join("");
+  select.value = selectedId;
+  if (!select.value) select.value = "uncategorized";
+}
+
+function saveRepoFromForm() {
+  const rawUrl = $("repoUrl").value.trim();
+  const fullName = parseRepoFullName(rawUrl) || parseRepoFullName($("repoName").value.trim()) || $("repoName").value.trim();
+  const name = $("repoName").value.trim() || fullName.split("/").pop();
+  const projectId = $("repoProject").value || "uncategorized";
+  const phaseId = $("repoPhase").value || "uncategorized";
+  const data = normalizeRepository({
+    id: editingRepoId || makeId(),
+    name,
+    fullName,
+    url: rawUrl || `https://github.com/${fullName}`,
+    htmlUrl: rawUrl || `https://github.com/${fullName}`,
+    description: $("repoDescription").value.trim(),
+    projectId,
+    projectName: projectId === "uncategorized" ? "未分類" : projectNameForIdea(projectId),
+    phaseId,
+    phaseTitle: phaseNameFor(projectId, phaseId),
+    status: $("repoStatus").value,
+    type: $("repoType").value,
+    priority: $("repoPriority").value,
+    nextAction: $("repoNextAction").value.trim(),
+    codexPrompt: $("repoCodexPrompt").value.trim(),
+    memo: $("repoMemo").value.trim()
+  });
+  const exists = state.repositories.find(r => r.id === editingRepoId || r.fullName.toLowerCase() === data.fullName.toLowerCase());
+  if (exists) Object.assign(exists, { ...data, id: exists.id });
+  else state.repositories.push(data);
+  save();
+  render();
+  $("repoDialog").close();
+  showToast("保存しました");
+}
+
+function parseRepoFullName(value = "") {
+  const trimmed = value.trim();
+  const match = trimmed.match(/github\.com\/([^/\s]+)\/([^/\s#?]+)/i);
+  if (match) return `${match[1]}/${match[2].replace(/\.git$/, "")}`;
+  if (/^[^/\s]+\/[^/\s]+$/.test(trimmed)) return trimmed.replace(/\.git$/, "");
+  return "";
+}
+
+window.openRepo = (id) => {
+  const repo = state.repositories.find(r => r.id === id);
+  if (repo?.htmlUrl || repo?.url) window.open(repo.htmlUrl || repo.url, "_blank", "noopener,noreferrer");
+};
+
+window.editRepo = (id) => {
+  const repo = state.repositories.find(r => r.id === id);
+  if (repo) openRepoDialog(repo);
+};
+
+window.deleteRepo = (id) => {
+  const repo = state.repositories.find(r => r.id === id);
+  if (!repo) return;
+  if (!confirm(`「${repo.fullName}」を削除する？`)) return;
+  state.repositories = state.repositories.filter(r => r.id !== id);
+  save();
+  render();
+};
+
+window.copyRepoPrompt = async (id) => {
+  const repo = state.repositories.find(r => r.id === id);
+  if (!repo) return;
+  const text = repo.codexPrompt || makeRepoCodexPrompt(repo);
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Codex依頼文をコピーしました");
+  } catch {
+    alert(text);
+  }
+};
+
+function makeRepoCodexPrompt(repo) {
+  return [
+    `対象リポジトリ: ${repo.fullName}`,
+    `GitHub URL: ${repo.htmlUrl || repo.url}`,
+    `紐づくプロジェクト: ${repo.projectName || "未分類"}`,
+    `紐づくフェーズ: ${repo.phaseTitle || "未分類"}`,
+    `現在の状態: ${repo.status}`,
+    `次の一手: ${repo.nextAction || "未設定"}`,
+    "",
+    "やってほしいこと:",
+    repo.nextAction || "リポジトリの現状を確認して、次に進めるべき作業を提案・実装してください。",
+    "",
+    "注意事項:",
+    "- 既存構成を尊重する",
+    "- 不要な外部依存を追加しない",
+    "- 変更後は動作確認する",
+    "",
+    "変更後に報告してほしいこと:",
+    "- 変更したファイル一覧",
+    "- 実装内容",
+    "- 動作確認結果",
+    "- 残タスク"
+  ].join("\n");
+}
+
 function openTaskDialog(task = null) {
   editingTaskId = task?.id || null;
   $("taskDialogTitle").textContent = task ? "タスク編集" : "タスク追加";
@@ -795,14 +1422,34 @@ function openTaskDialog(task = null) {
   $("taskDialog").showModal();
 }
 
-window.editTask = (id) => {
-  const p = currentProject();
-  const task = p.tasks.find(t => t.id === id);
-  if (task) openTaskDialog(task);
+window.toggleProjectOpen = (projectId) => {
+  state.ui.openProjects[projectId] = state.ui.openProjects[projectId] === false;
+  save();
+  render();
 };
 
-window.deleteTask = (id) => {
-  const p = currentProject();
+window.togglePhaseOpen = (projectId, phaseId) => {
+  const key = `${projectId}:${phaseId}`;
+  state.ui.openPhases[key] = state.ui.openPhases[key] === false;
+  save();
+  render();
+};
+
+function findProject(projectId) {
+  return state.projects.find(p => p.id === projectId) || currentProject();
+}
+
+window.editTask = (id, projectId = state.selectedProjectId) => {
+  const p = findProject(projectId);
+  const task = p.tasks.find(t => t.id === id);
+  if (task) {
+    state.selectedProjectId = p.id;
+    openTaskDialog(task);
+  }
+};
+
+window.deleteTask = (id, projectId = state.selectedProjectId) => {
+  const p = findProject(projectId);
   const task = p.tasks.find(t => t.id === id);
   if (!task) return;
   if (!confirm(`「${task.title}」を削除する？`)) return;
@@ -811,11 +1458,31 @@ window.deleteTask = (id) => {
   render();
 };
 
-window.setTaskStatus = (id, status) => {
-  const p = currentProject();
+window.setTaskStatus = (id, status, projectId = state.selectedProjectId) => {
+  const p = findProject(projectId);
   const task = p.tasks.find(t => t.id === id);
   if (!task) return;
   task.status = status;
+  if (status === "done") task.focus = false;
+  save();
+  render();
+};
+
+window.setTaskFocus = (projectId, taskId) => {
+  const project = findProject(projectId);
+  const task = project.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  task.focus = !task.focus;
+  if (task.focus && task.status === "todo") task.status = "doing";
+  save();
+  render();
+};
+
+window.toggleTaskBlocked = (projectId, taskId) => {
+  const project = findProject(projectId);
+  const task = project.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  task.isBlocked = !task.isBlocked;
   save();
   render();
 };
@@ -845,41 +1512,69 @@ function makeChatGPTText() {
   lines.push("【プロジェクト進捗共有】");
   lines.push(`更新日時: ${now.toLocaleString("ja-JP")}`);
   lines.push("");
-  lines.push("この進捗を前提に、次に何をやるべきか判断して。終わっているものは完了扱い、未完了は次タスク候補として見て。");
+  lines.push("この進捗を前提に、次に何をやるべきか判断して。今日の集中、詰まり中、未タスク化アイデア、GitHubリポジトリの次の一手を見て優先順位を提案して。");
   lines.push("");
 
-  state.projects.forEach((p, index) => {
-    const rate = projectRate(p);
-    lines.push(`## ${index + 1}. ${p.name}（${p.status || "未設定"} / ${rate}%）`);
-    if (p.mission) lines.push(`目的: ${p.mission}`);
-    if (p.nextAction) lines.push(`次の一手: ${p.nextAction}`);
-    if (p.costLimit) lines.push(`コスト上限: ${p.costLimit}`);
-    if (p.link) lines.push(`リンク: ${p.link}`);
-    lines.push("タスク:");
-    (p.tasks || []).forEach(t => {
-      const mark = t.status === "done" ? "x" : " ";
-      const status = statusLabel(t.status);
-      const priority = priorityLabel(t.priority).replace("優先度 ", "");
-      const due = t.due ? ` / 期限:${t.due}` : "";
-      lines.push(`- [${mark}] ${t.title}（${status} / 優先度:${priority}${due}）`);
-      if (t.note) lines.push(`  メモ: ${t.note}`);
+  const focus = pickFocusTask();
+  lines.push("【今日の集中】");
+  if (focus) {
+    lines.push(`- ${focus.projectName}: ${displayTaskTitle(focus)}`);
+    if (focus.note) lines.push(`  メモ: ${focus.note}`);
+  } else {
+    lines.push("- 未完了タスクなし");
+  }
+  lines.push("");
+
+  const blocked = allTasks().filter(t => t.status !== "done" && t.isBlocked);
+  lines.push("【詰まり中】");
+  if (blocked.length) {
+    blocked.forEach(t => lines.push(`- ${t.projectName}: ${displayTaskTitle(t)}（${t.phaseTitle || "未分類"}）`));
+  } else {
+    lines.push("- なし");
+  }
+  lines.push("");
+
+  lines.push("【プロジェクト進捗ツリー】");
+  state.projects.forEach(project => {
+    lines.push(`## ${project.name}（${project.status || "未設定"} / ${projectRate(project)}%）`);
+    if (project.mission) lines.push(`目的: ${project.mission}`);
+    if (project.nextAction) lines.push(`次の一手: ${project.nextAction}`);
+    groupTasksByPhase(project).forEach(phase => {
+      lines.push(`### ${phase.phaseTitle}`);
+      phase.tasks.forEach(t => {
+        const mark = t.status === "done" ? "x" : " ";
+        const status = statusLabel(t.status);
+        const priority = priorityLabel(t.priority).replace("優先度 ", "");
+        const flags = [t.focus ? "今日やる" : "", t.isBlocked ? "詰まり中" : ""].filter(Boolean).join(" / ");
+        lines.push(`- [${mark}] ${displayTaskTitle(t)}（${status} / 優先度:${priority}${flags ? " / " + flags : ""}）`);
+        if (t.note) lines.push(`  メモ: ${t.note}`);
+      });
+      lines.push("");
     });
-    lines.push("");
   });
 
   const inboxIdeas = (state.ideas || []).filter(idea => idea.status !== "converted");
+  lines.push("【アイデア箱】");
   if (inboxIdeas.length) {
-    lines.push("## アイデア箱（未タスク化）");
-    lines.push("次タスクにするべきアイデアを優先度とプロジェクト文脈で判断して。");
     inboxIdeas
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
       .forEach(idea => {
         const priority = priorityLabel(idea.priority).replace("優先度 ", "");
-        lines.push(`- ${idea.title}（${projectNameForIdea(idea.projectId, idea.projectName)} / 優先度:${priority} / 作成:${formatDateTime(idea.createdAt)}）`);
+        lines.push(`- ${idea.title}（${projectNameForIdea(idea.projectId, idea.projectName)} / ${idea.phaseTitle || "未分類"} / 優先度:${priority} / 作成:${formatDateTime(idea.createdAt)}）`);
         if (idea.note) lines.push(`  メモ: ${idea.note}`);
       });
-    lines.push("");
+  } else {
+    lines.push("- 未タスク化アイデアなし");
   }
+  lines.push("");
+
+  lines.push("【GitHubリポジトリ箱】");
+  (state.repositories || []).forEach(repo => {
+    lines.push(`- ${repo.fullName}（${repo.projectName || "未分類"} / ${repo.status} / ${repo.type} / push:${formatDateTime(repo.pushedAt || repo.updatedAt)}）`);
+    if (repo.nextAction) lines.push(`  次の一手: ${repo.nextAction}`);
+    if (repo.projectId === "uncategorized") lines.push("  未分類リポジトリ");
+  });
+  lines.push("");
 
   if (state.memo) {
     lines.push("## 全体メモ");
@@ -940,9 +1635,10 @@ function escapeAttr(str = "") {
 }
 
 $("addProjectBtn").onclick = addProject;
-$("addTaskBtn").onclick = () => openTaskDialog();
 $("openIdeaBtn").onclick = () => openIdeaDialog();
 $("quickIdeaBtn").onclick = () => openIdeaDialog();
+$("fetchReposBtn").onclick = fetchGithubRepos;
+$("addRepoBtn").onclick = () => openRepoDialog();
 $("copyForChatGPTBtn").onclick = copyPayload;
 $("downloadProgressBtn").onclick = downloadProgressTxt;
 $("selectPayloadBtn").onclick = () => {
@@ -957,6 +1653,13 @@ $("saveIdeaBtn").onclick = () => {
 $("saveIdeaContinueBtn").onclick = () => {
   ideaSaveMode = "continue";
 };
+
+$("ideaProject").onchange = () => populateIdeaPhases($("ideaProject").value, "uncategorized");
+$("repoProject").onchange = () => populateRepoPhases($("repoProject").value, "uncategorized");
+$("repoUrl").addEventListener("input", () => {
+  const fullName = parseRepoFullName($("repoUrl").value);
+  if (fullName && !$("repoName").value.trim()) $("repoName").value = fullName.split("/").pop();
+});
 
 $("taskForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -992,13 +1695,22 @@ $("ideaForm").addEventListener("submit", (e) => {
   saveIdea({ keepOpen: ideaSaveMode === "continue" });
 });
 
-document.querySelectorAll(".filter").forEach(btn => {
+$("repoForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (e.submitter?.value === "cancel") {
+    $("repoDialog").close();
+    return;
+  }
+  saveRepoFromForm();
+});
+
+document.querySelectorAll(".tree-filter").forEach(btn => {
   btn.onclick = () => {
-    state.filter = btn.dataset.filter;
-    document.querySelectorAll(".filter").forEach(b => b.classList.remove("active"));
+    state.treeFilter = btn.dataset.treeFilter;
+    document.querySelectorAll(".tree-filter").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     save();
-    renderTasks();
+    renderProjectTree();
   };
 });
 

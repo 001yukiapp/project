@@ -33,53 +33,24 @@
       </div>
     </section>
 
-    <section class="panel sticky-panel">
-      <div class="panel-head">
-        <h2>ChatGPT連携</h2>
-        <button id="copyForChatGPTBtn" class="primary small">コピー</button>
-      </div>
-      <p class="hint">
-        チェックした内容をChatGPTに伝える用の文章を自動生成します。コピーしてこのチャットに貼れば、次の相談でその状態を前提にできます。
-      </p>
-      <textarea id="chatgptPayload" readonly></textarea>
-      <div class="row gap">
-        <button id="downloadProgressBtn" class="ghost">進捗TXT保存</button>
-        <button id="selectPayloadBtn" class="ghost">選択</button>
-      </div>
-    </section>
-
     <main>
-      <section class="panel">
-        <div class="panel-head">
-          <h2>全プロジェクト進捗</h2>
-          <button id="addProjectBtn" class="primary small">プロジェクト追加</button>
-        </div>
-        <div id="progressBoard" class="progress-board"></div>
-      </section>
+      <section id="focusArea" class="focus-area"></section>
 
       <section class="panel">
         <div class="panel-head">
-          <h2>編集するプロジェクト</h2>
+          <h2>プロジェクト進捗ツリー</h2>
+          <div class="row gap">
+            <button id="addProjectBtn" class="primary small">プロジェクト追加</button>
+          </div>
         </div>
-        <div id="projectTabs" class="tabs"></div>
-      </section>
-
-      <section id="projectEditor" class="panel"></section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>選択中プロジェクトのタスク</h2>
-          <button id="addTaskBtn" class="primary small">タスク追加</button>
+        <div class="filters tree-filters">
+          <button class="tree-filter active" data-tree-filter="all">全部</button>
+          <button class="tree-filter" data-tree-filter="open">未完了</button>
+          <button class="tree-filter" data-tree-filter="high">高優先度</button>
+          <button class="tree-filter" data-tree-filter="focus">今日やる</button>
+          <button class="tree-filter" data-tree-filter="blocked">詰まり中</button>
         </div>
-
-        <div class="filters">
-          <button class="filter active" data-filter="all">全部</button>
-          <button class="filter" data-filter="todo">未着手</button>
-          <button class="filter" data-filter="doing">作業中</button>
-          <button class="filter" data-filter="done">完了</button>
-        </div>
-
-        <div id="taskList" class="task-list"></div>
+        <div id="projectTree" class="project-tree"></div>
       </section>
 
       <section class="panel">
@@ -88,6 +59,33 @@
           <button id="openIdeaBtn" class="primary small">＋アイデア</button>
         </div>
         <div id="ideaList" class="idea-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>GitHubリポジトリ箱</h2>
+          <div class="row gap">
+            <button id="fetchReposBtn" class="primary small">GitHubから取得</button>
+            <button id="addRepoBtn" class="ghost small">リポジトリ追加</button>
+          </div>
+        </div>
+        <p id="repoSyncStatus" class="hint"></p>
+        <div id="repoList" class="repo-list"></div>
+      </section>
+
+      <section class="panel sticky-panel">
+        <div class="panel-head">
+          <h2>ChatGPT連携</h2>
+          <button id="copyForChatGPTBtn" class="primary small">コピー</button>
+        </div>
+        <p class="hint">
+          今日の集中、詰まり中、プロジェクトツリー、アイデア箱、GitHubリポジトリ箱をまとめて共有できます。
+        </p>
+        <textarea id="chatgptPayload" readonly></textarea>
+        <div class="row gap">
+          <button id="downloadProgressBtn" class="ghost">進捗TXT保存</button>
+          <button id="selectPayloadBtn" class="ghost">選択</button>
+        </div>
       </section>
 
       <section class="panel">
@@ -149,6 +147,9 @@
       <label>紐づけるプロジェクト
         <select id="ideaProject"></select>
       </label>
+      <label>フェーズ
+        <select id="ideaPhase"></select>
+      </label>
       <label>メモ
         <textarea id="ideaNote" placeholder="補足、きっかけ、あとで調べること"></textarea>
       </label>
@@ -163,6 +164,72 @@
         <button value="cancel" class="ghost">キャンセル</button>
         <button id="saveIdeaContinueBtn" value="default" class="ghost">保存して続ける</button>
         <button id="saveIdeaBtn" value="default" class="primary">保存</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="repoDialog">
+    <form method="dialog" id="repoForm">
+      <h2 id="repoDialogTitle">リポジトリ追加</h2>
+      <label>GitHub URL / fullName
+        <input id="repoUrl" placeholder="https://github.com/001yukiapp/project" />
+      </label>
+      <label>リポジトリ名
+        <input id="repoName" required placeholder="project" />
+      </label>
+      <label>説明
+        <textarea id="repoDescription" placeholder="何のリポジトリか"></textarea>
+      </label>
+      <div class="grid2">
+        <label>プロジェクト
+          <select id="repoProject"></select>
+        </label>
+        <label>フェーズ
+          <select id="repoPhase"></select>
+        </label>
+      </div>
+      <div class="grid2">
+        <label>状態
+          <select id="repoStatus">
+            <option value="active">active</option>
+            <option value="paused">paused</option>
+            <option value="released">released</option>
+            <option value="broken">broken</option>
+            <option value="idea">idea</option>
+            <option value="archived">archived</option>
+          </select>
+        </label>
+        <label>種類
+          <select id="repoType">
+            <option value="app">app</option>
+            <option value="pwa">pwa</option>
+            <option value="website">website</option>
+            <option value="tool">tool</option>
+            <option value="experiment">experiment</option>
+            <option value="article">article</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+      </div>
+      <label>優先度
+        <select id="repoPriority">
+          <option value="high">高</option>
+          <option value="mid" selected>中</option>
+          <option value="low">低</option>
+        </select>
+      </label>
+      <label>次の一手
+        <textarea id="repoNextAction" placeholder="Codexに次に頼みたいこと"></textarea>
+      </label>
+      <label>Codex依頼文
+        <textarea id="repoCodexPrompt" placeholder="空なら自動生成します"></textarea>
+      </label>
+      <label>メモ
+        <textarea id="repoMemo"></textarea>
+      </label>
+      <menu>
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button id="saveRepoBtn" value="default" class="primary">保存</button>
       </menu>
     </form>
   </dialog>
