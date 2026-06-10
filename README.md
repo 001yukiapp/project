@@ -24,7 +24,42 @@
 
 `index.html` をブラウザで開けば動きます。
 
+GitHub Pagesで公開した場合は、次のURLでアクセスできます。
+
+```text
+https://001yukiapp.github.io/project/
+```
+
 「ChatGPT連携」のコピーを押して、このチャットに貼ると、ChatGPTが現在の進捗を前提に次の判断をできます。
+
+## GitHub Pagesで公開する手順
+
+1. GitHubのリポジトリ `001yukiapp/project` を開く
+2. `Settings` → `Pages` を開く
+3. `Build and deployment` の `Source` を `Deploy from a branch` にする
+4. `Branch` を `main`、フォルダを `/ (root)` にする
+5. `Save` を押す
+6. 数分後に `https://001yukiapp.github.io/project/` を開いて確認する
+
+## ファイル構成
+
+```text
+index.html
+styles.css
+app.js
+manifest.webmanifest
+icon.svg
+sw.js
+README.md
+```
+
+アプリ本体はリポジトリ直下で動く構成です。CSS、JavaScript、manifest、Service Workerは相対パスで参照しているため、GitHub Pagesの `/project/` 配下でも動く想定です。
+
+## データ保存について
+
+データはブラウザの `localStorage` に保存されます。サーバーや外部APIには送信しません。
+
+ブラウザを変えたり、別端末で開いたりすると保存データは共有されません。必要な場合は、JSONバックアップを書き出してから別環境でインポートしてください。
 
 ## 注意
 
