@@ -1,5 +1,5 @@
 const STORAGE_KEY = "project-control-mini-v2";
-const DATA_VERSION = 4;
+const DATA_VERSION = 5;
 
 function task(id, title, note = "", priority = "mid") {
   return { id, title, note, status: "todo", priority, due: "" };
@@ -10,6 +10,7 @@ const defaultState = {
   selectedProjectId: "p-photo",
   filter: "all",
   memo: "",
+  ideas: [],
   projects: [
     {
       id: "p-photo",
@@ -252,6 +253,8 @@ const defaultState = {
 
 let state = load();
 let editingTaskId = null;
+let editingIdeaId = null;
+let ideaSaveMode = "close";
 
 const $ = (id) => document.getElementById(id);
 
@@ -326,7 +329,8 @@ function migrateState(savedState) {
     ...savedState,
     dataVersion: DATA_VERSION,
     selectedProjectId,
-    projects: [...migratedProjects, ...customProjects]
+    projects: [...migratedProjects, ...customProjects],
+    ideas: Array.isArray(savedState.ideas) ? savedState.ideas : []
   };
 }
 
@@ -377,6 +381,20 @@ function normalizeState(s) {
       t.due ||= "";
     });
   });
+  if (!Array.isArray(merged.ideas)) merged.ideas = [];
+  merged.ideas.forEach(idea => {
+    idea.id ||= makeId();
+    idea.title ||= "無題アイデア";
+    idea.note ||= "";
+    idea.projectId ||= "uncategorized";
+    idea.projectName = idea.projectId === "uncategorized"
+      ? "未分類"
+      : (merged.projects.find(p => p.id === idea.projectId)?.name || idea.projectName || "未分類");
+    idea.priority ||= "mid";
+    idea.status ||= "inbox";
+    idea.createdAt ||= new Date().toISOString();
+    idea.updatedAt ||= idea.createdAt;
+  });
   return merged;
 }
 
@@ -397,6 +415,7 @@ function render() {
   renderTabs();
   renderProjectEditor();
   renderTasks();
+  renderIdeas();
 
   $("globalMemo").value = state.memo || "";
   updateChatGPTPayload();
@@ -595,6 +614,176 @@ function renderTasks() {
   `).join("");
 }
 
+function renderIdeas() {
+  const list = $("ideaList");
+  if (!list) return;
+  const ideas = [...(state.ideas || [])]
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  if (!ideas.length) {
+    list.innerHTML = `<p class="empty">まだアイデアなし。右下の「＋アイデア」から思いつきを入れよう。</p>`;
+    return;
+  }
+
+  list.innerHTML = ideas.map(idea => `
+    <article class="idea ${idea.status === "converted" ? "converted" : ""}">
+      <p class="idea-title">${escapeHtml(idea.title)}</p>
+      <div class="idea-meta">
+        <span class="badge">${escapeHtml(projectNameForIdea(idea.projectId, idea.projectName))}</span>
+        <span class="badge ${escapeAttr(idea.priority)}">${priorityLabel(idea.priority)}</span>
+        <span class="badge">${idea.status === "converted" ? "タスク化済み" : "未タスク化"}</span>
+        <span class="badge">${formatDateTime(idea.createdAt)}</span>
+      </div>
+      ${idea.note ? `<p class="idea-note">${escapeHtml(idea.note)}</p>` : ""}
+      <div class="idea-actions">
+        <button onclick="editIdea('${idea.id}')" class="ghost">編集</button>
+        <button onclick="convertIdeaToTask('${idea.id}')" class="primary" ${idea.status === "converted" ? "disabled" : ""}>タスク化</button>
+        <button onclick="deleteIdea('${idea.id}')" class="danger">削除</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function openIdeaDialog(idea = null) {
+  editingIdeaId = idea?.id || null;
+  ideaSaveMode = "close";
+  populateIdeaProjects(idea?.projectId || currentProject()?.id || "uncategorized");
+  $("ideaDialogTitle").textContent = idea ? "アイデア編集" : "アイデア追加";
+  $("ideaTitle").value = idea?.title || "";
+  $("ideaNote").value = idea?.note || "";
+  $("ideaPriority").value = idea?.priority || "mid";
+  $("saveIdeaContinueBtn").style.display = idea ? "none" : "";
+  $("ideaDialog").showModal();
+  $("ideaTitle").focus();
+}
+
+function populateIdeaProjects(selectedId = "uncategorized") {
+  const select = $("ideaProject");
+  select.innerHTML = [
+    ...state.projects.map(p => `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`),
+    `<option value="uncategorized">未分類</option>`
+  ].join("");
+  select.value = selectedId;
+  if (!select.value) select.value = "uncategorized";
+}
+
+function projectNameForIdea(projectId, fallback = "") {
+  if (projectId === "uncategorized") return "未分類";
+  return state?.projects?.find(p => p.id === projectId)?.name || fallback || "未分類";
+}
+
+function saveIdea({ keepOpen = false } = {}) {
+  const title = $("ideaTitle").value.trim();
+  if (!title) return false;
+
+  const now = new Date().toISOString();
+  const projectId = $("ideaProject").value || "uncategorized";
+  const data = {
+    title,
+    note: $("ideaNote").value.trim(),
+    projectId,
+    projectName: projectNameForIdea(projectId),
+    priority: $("ideaPriority").value,
+    updatedAt: now
+  };
+
+  if (editingIdeaId) {
+    const idea = state.ideas.find(i => i.id === editingIdeaId);
+    if (idea) Object.assign(idea, data);
+  } else {
+    state.ideas.push({
+      id: makeId(),
+      ...data,
+      status: "inbox",
+      createdAt: now
+    });
+  }
+
+  save();
+  render();
+  showToast("保存しました");
+
+  if (keepOpen && !editingIdeaId) {
+    $("ideaTitle").value = "";
+    $("ideaNote").value = "";
+    $("ideaPriority").value = "mid";
+    $("ideaTitle").focus();
+  } else {
+    $("ideaDialog").close();
+  }
+  return true;
+}
+
+window.editIdea = (id) => {
+  const idea = state.ideas.find(i => i.id === id);
+  if (idea) openIdeaDialog(idea);
+};
+
+window.deleteIdea = (id) => {
+  const idea = state.ideas.find(i => i.id === id);
+  if (!idea) return;
+  if (!confirm(`「${idea.title}」を削除する？`)) return;
+  state.ideas = state.ideas.filter(i => i.id !== id);
+  save();
+  render();
+  showToast("削除しました");
+};
+
+window.convertIdeaToTask = (id) => {
+  const idea = state.ideas.find(i => i.id === id);
+  if (!idea || idea.status === "converted") return;
+
+  let projectId = idea.projectId;
+  if (projectId === "uncategorized" || !state.projects.some(p => p.id === projectId)) {
+    projectId = chooseProjectForIdea();
+    if (!projectId) return;
+  }
+
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+
+  project.tasks.push({
+    id: makeId(),
+    title: idea.title,
+    note: idea.note,
+    status: "todo",
+    priority: idea.priority,
+    due: ""
+  });
+  idea.status = "converted";
+  idea.projectId = project.id;
+  idea.projectName = project.name;
+  idea.updatedAt = new Date().toISOString();
+  state.selectedProjectId = project.id;
+  save();
+  render();
+  showToast("タスク化しました");
+};
+
+function chooseProjectForIdea() {
+  const lines = state.projects.map((p, index) => `${index + 1}: ${p.name}`).join("\n");
+  const answer = prompt(`タスク化するプロジェクト番号を入力してください。\n${lines}`, "1");
+  if (!answer) return "";
+  const index = Number(answer) - 1;
+  return state.projects[index]?.id || "";
+}
+
+function showToast(message) {
+  const toast = $("toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 1700);
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function openTaskDialog(task = null) {
   editingTaskId = task?.id || null;
   $("taskDialogTitle").textContent = task ? "タスク編集" : "タスク追加";
@@ -678,6 +867,20 @@ function makeChatGPTText() {
     lines.push("");
   });
 
+  const inboxIdeas = (state.ideas || []).filter(idea => idea.status !== "converted");
+  if (inboxIdeas.length) {
+    lines.push("## アイデア箱（未タスク化）");
+    lines.push("次タスクにするべきアイデアを優先度とプロジェクト文脈で判断して。");
+    inboxIdeas
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .forEach(idea => {
+        const priority = priorityLabel(idea.priority).replace("優先度 ", "");
+        lines.push(`- ${idea.title}（${projectNameForIdea(idea.projectId, idea.projectName)} / 優先度:${priority} / 作成:${formatDateTime(idea.createdAt)}）`);
+        if (idea.note) lines.push(`  メモ: ${idea.note}`);
+      });
+    lines.push("");
+  }
+
   if (state.memo) {
     lines.push("## 全体メモ");
     lines.push(state.memo);
@@ -738,11 +941,21 @@ function escapeAttr(str = "") {
 
 $("addProjectBtn").onclick = addProject;
 $("addTaskBtn").onclick = () => openTaskDialog();
+$("openIdeaBtn").onclick = () => openIdeaDialog();
+$("quickIdeaBtn").onclick = () => openIdeaDialog();
 $("copyForChatGPTBtn").onclick = copyPayload;
 $("downloadProgressBtn").onclick = downloadProgressTxt;
 $("selectPayloadBtn").onclick = () => {
   $("chatgptPayload").focus();
   $("chatgptPayload").select();
+};
+
+$("saveIdeaBtn").onclick = () => {
+  ideaSaveMode = "close";
+};
+
+$("saveIdeaContinueBtn").onclick = () => {
+  ideaSaveMode = "continue";
 };
 
 $("taskForm").addEventListener("submit", (e) => {
@@ -768,6 +981,15 @@ $("taskForm").addEventListener("submit", (e) => {
   save();
   $("taskDialog").close();
   render();
+});
+
+$("ideaForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (e.submitter?.value === "cancel") {
+    $("ideaDialog").close();
+    return;
+  }
+  saveIdea({ keepOpen: ideaSaveMode === "continue" });
 });
 
 document.querySelectorAll(".filter").forEach(btn => {
@@ -802,7 +1024,7 @@ $("importFile").onchange = async (e) => {
     const text = await file.text();
     const imported = JSON.parse(text);
     if (!Array.isArray(imported.projects)) throw new Error("bad file");
-    state = normalizeState(imported);
+    state = normalizeState(migrateState(imported));
     save();
     render();
     alert("インポート完了");
@@ -813,7 +1035,7 @@ $("importFile").onchange = async (e) => {
 
 $("resetBtn").onclick = () => {
   if (!confirm("初期データに戻す？今のデータは消えます。先にバックアップ推奨。")) return;
-  state = structuredClone(defaultState);
+  state = normalizeState(structuredClone(defaultState));
   save();
   render();
 };

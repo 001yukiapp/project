@@ -335,6 +335,89 @@ input:focus, textarea:focus, select:focus {
 
 .task-actions button { padding: 7px 9px; font-size: 12px; }
 
+.idea-list {
+  display: grid;
+  gap: 10px;
+}
+
+.idea {
+  background: rgba(255,255,255,.055);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 13px;
+}
+
+.idea.converted {
+  opacity: .62;
+}
+
+.idea-title {
+  font-weight: 850;
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+
+.idea-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.idea-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.idea-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.idea-actions button { padding: 7px 9px; font-size: 12px; }
+
+.quick-idea-btn {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 20;
+  min-width: 118px;
+  min-height: 54px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent2), #3b82f6);
+  color: white;
+  font-weight: 900;
+  box-shadow: 0 16px 38px rgba(0,0,0,.42);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(86px, calc(env(safe-area-inset-bottom) + 86px));
+  z-index: 30;
+  transform: translate(-50%, 18px);
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(244,247,251,.96);
+  color: #111827;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .empty {
   color: var(--muted);
   border: 1px dashed var(--line);
@@ -364,6 +447,8 @@ input:focus, textarea:focus, select:focus {
 
 dialog {
   width: min(520px, calc(100% - 28px));
+  max-height: min(760px, calc(100dvh - 24px));
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 0;
@@ -384,6 +469,14 @@ menu {
   margin: 6px 0 0;
 }
 
+.idea-menu {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, #111827 78%, rgba(17,24,39,0));
+  padding-top: 12px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 900px) {
   .progress-board { grid-template-columns: 1fr; }
   .sticky-panel { position: static; }
@@ -395,4 +488,14 @@ menu {
   .summary-card { padding: 12px 10px; }
   .summary-card span { font-size: 20px; }
   .grid2 { grid-template-columns: 1fr; }
+  .app { padding-bottom: 92px; }
+  .quick-idea-btn {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    min-width: 108px;
+    min-height: 52px;
+  }
+  .idea-menu button {
+    flex: 1 1 auto;
+  }
 }

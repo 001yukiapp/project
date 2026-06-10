@@ -83,6 +83,14 @@
       </section>
 
       <section class="panel">
+        <div class="panel-head">
+          <h2>アイデア箱</h2>
+          <button id="openIdeaBtn" class="primary small">＋アイデア</button>
+        </div>
+        <div id="ideaList" class="idea-list"></div>
+      </section>
+
+      <section class="panel">
         <h2>全体メモ</h2>
         <textarea id="globalMemo" placeholder="迷ったこと、あとで考えること、思いついたアイデアを書いておく"></textarea>
       </section>
@@ -131,6 +139,36 @@
       </menu>
     </form>
   </dialog>
+
+  <dialog id="ideaDialog" class="idea-dialog">
+    <form method="dialog" id="ideaForm">
+      <h2 id="ideaDialogTitle">アイデア追加</h2>
+      <label>アイデア本文
+        <input id="ideaTitle" required placeholder="思いついたことをポンと入れる" />
+      </label>
+      <label>紐づけるプロジェクト
+        <select id="ideaProject"></select>
+      </label>
+      <label>メモ
+        <textarea id="ideaNote" placeholder="補足、きっかけ、あとで調べること"></textarea>
+      </label>
+      <label>優先度
+        <select id="ideaPriority">
+          <option value="high">高</option>
+          <option value="mid" selected>中</option>
+          <option value="low">低</option>
+        </select>
+      </label>
+      <menu class="idea-menu">
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button id="saveIdeaContinueBtn" value="default" class="ghost">保存して続ける</button>
+        <button id="saveIdeaBtn" value="default" class="primary">保存</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <button id="quickIdeaBtn" class="quick-idea-btn">＋アイデア</button>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="./app.js"></script>
 </body>
