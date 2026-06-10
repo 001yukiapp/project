@@ -1,24 +1,235 @@
 const STORAGE_KEY = "project-control-mini-v2";
+const DATA_VERSION = 4;
+
+function task(id, title, note = "", priority = "mid") {
+  return { id, title, note, status: "todo", priority, due: "" };
+}
 
 const defaultState = {
-  selectedProjectId: "p-mikke",
+  dataVersion: DATA_VERSION,
+  selectedProjectId: "p-photo",
   filter: "all",
   memo: "",
   projects: [
     {
-      id: "p-mikke",
-      name: "みっけ図鑑",
-      status: "最優先",
-      mission: "現実の生き物を撮って、自分だけの図鑑を埋めるSNS/ネイティブアプリを作る",
-      nextAction: "Expoで画面モック → 撮影 → 図鑑カード保存まで作る",
-      costLimit: "Apple Developer登録まではほぼ0円。AI APIは最初使わない",
+      id: "p-photo",
+      name: "写真図鑑（みっけ図鑑）",
+      status: "最優先 / 検証中",
+      mission: "現実世界で見つけた生き物をスマホで撮影し、自分だけの図鑑に追加していく収集型SNS/ネイティブアプリを作る。最初はAI APIを使わず、ユーザーがカテゴリを選ぶ方式でAPIコスト0円で検証する。Gotchaは参考事例として分析しつつ、丸パクリせず、日本の街歩き・猫・鳥・虫・地域チャレンジ文化と、集めた生き物が浮いて見える立体感のある「浮かぶコレクション図鑑」で差別化する。",
+      nextAction: "Expoでネイティブアプリの画面モックを作り、写真撮影 → カテゴリ選択 → 図鑑カード保存 → チャレンジ投稿までの最小体験を作る。3D感/浮遊感はMVP後に段階導入し、まずは通常の写真保存と図鑑追加を優先する。",
+      costLimit: "Apple Developer登録まではほぼ0円。AI APIは最初使わない。画像保存やログインもMVPでは最小限にして、必要になったらSupabase等を検討する。重い3D処理、本物の3Dモデル生成、AR配置はMVPではやらない。",
       link: "",
       tasks: [
-        { id: makeId(), title: "アプリ名と世界観を仮決定", note: "みっけ図鑑 / ねこみっけ / まちいきもの図鑑", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "画面構成を決める", note: "ホーム / 撮影 / 図鑑 / チャレンジ / プロフィール", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "AIなしMVP仕様に固定", note: "ユーザーがカテゴリ選択。APIコスト0円で検証", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "Expoプロジェクト作成", note: "最初は見た目だけでOK", status: "todo", priority: "mid", due: "" },
-        { id: makeId(), title: "図鑑カードの見た目を作る", note: "レア度 / 日付 / 場所ざっくり / コメント", status: "todo", priority: "mid", due: "" }
+        task("photo-p0-concept", "Phase 0: 写真図鑑の一言コンセプトを決める", "例「現実の生き物を見つけて、自分だけの図鑑を埋めるアプリ」", "high"),
+        task("photo-p0-diff", "Phase 0: Gotchaの丸パクリにならない差別化を決める", "日本の街歩き、猫、鳥、虫、地域チャレンジ、SNS投稿、浮かぶコレクション図鑑に寄せる", "high"),
+        task("photo-p0-category", "Phase 0: 最初の対象カテゴリを決める", "猫 / 犬 / 鳥 / 虫 / 爬虫類 / 両生類 / その他", "high"),
+        task("photo-p0-name", "Phase 0: アプリ名候補を3〜5個出す", "みっけ図鑑、ねこみっけ、まちいきもの図鑑、いきものガチャ図鑑など", "mid"),
+        task("photo-p0-target", "Phase 0: 最初のターゲットユーザーを決める", "女子高生/大学生、猫好き、散歩好き、親子、自然観察好きなど", "mid"),
+        task("photo-p1-domestic", "Phase 1: 国内で近いアプリ/サービスを調べる", "動物図鑑、植物図鑑、写真投稿、ポケモンGO系、散歩アプリ", "high"),
+        task("photo-p1-overseas", "Phase 1: 海外で近いアプリ/サービスを調べる", "Gotcha、iNaturalist、Seek、Pokémon GO系", "high"),
+        task("photo-p1-sns", "Phase 1: X/TikTok/Instagramで動物写真が伸びている投稿を集める", "猫、鳥、虫、散歩、珍しい生き物、地域ネタ", "mid"),
+        task("photo-p1-themes", "Phase 1: ユーザーが投稿したくなるテーマを20個出す", "今週の白猫、変な寝方の猫、雨の日のカエル、夕方のカラスなど", "mid"),
+        task("photo-p1-collect", "Phase 1: 収集欲を刺激する要素を洗い出す", "図鑑埋め、レア度、バッジ、称号、連続発見、地域限定、期間限定", "mid"),
+        task("photo-p1-location", "Phase 1: 位置情報の扱い方を決める", "詳細住所は出さず、市区町村や数km単位でぼかす", "high"),
+        task("photo-p1-privacy", "Phase 1: プライバシー/安全リスクを洗い出す", "人の顔、車のナンバー、自宅特定、希少生物の位置情報、未成年利用", "high"),
+        task("photo-gotcha-concept", "Phase 1.5: Gotchaのコンセプトを整理する", "現実世界の生き物をスマホで見つけて、図鑑/コレクションに追加していく体験を参考にする", "high"),
+        task("photo-gotcha-flow", "Phase 1.5: Gotchaの主な体験フローを分解する", "発見 → 撮影/認識 → コレクション化 → 図鑑埋め → SNSで話題化、の流れを確認する", "high"),
+        task("photo-gotcha-strong", "Phase 1.5: Gotchaの強そうな点を洗い出す", "収集欲、ポケモン的な図鑑埋め、現実世界との連動、SNS映え、誰でも参加できる分かりやすさ", "mid"),
+        task("photo-gotcha-weak", "Phase 1.5: Gotchaの弱そうな点を仮説で洗い出す", "日本ローカライズ、地域性、猫/鳥/虫など日本の街歩き文脈、コミュニティ、チャレンジ性、プライバシー対応", "mid"),
+        task("photo-gotcha-diff", "Phase 1.5: Gotchaと差別化するポイントを決める", "日本の街歩き、猫特化、週替わりチャレンジ、地域限定バッジ、SNS投稿テンプレ、親子/散歩/女子向けUI、浮遊感のあるコレクション演出", "high"),
+        task("photo-gotcha-no-copy", "Phase 1.5: 絶対にコピーしない要素を明文化する", "名前、ロゴ、UI配置、文章、独自キャラクター、演出、ブランド表現は真似しない", "high"),
+        task("photo-gotcha-abstract", "Phase 1.5: 参考にしてよい要素を明文化する", "現実の生き物を集める、図鑑を埋める、発見体験を楽しくする、チャレンジで投稿を促す、という抽象的な仕組み", "high"),
+        task("photo-gotcha-market", "Phase 1.5: 日本版で先に取りにいく市場を決める", "まずは猫・鳥・虫・散歩・地域チャレンジ。広い動物図鑑ではなく、SNSで投稿されやすい身近な生き物から始める", "mid"),
+        task("photo-gotcha-counter", "Phase 1.5: Gotchaが日本に来た場合の対抗策を考える", "日本語UI、地域イベント、猫チャレンジ、学校/親子/観光地向け、ローカルコミュニティで差別化", "mid"),
+        task("photo-gotcha-mvp", "Phase 1.5: Gotchaより先に出すMVP範囲を決める", "AI高精度判定よりも、撮影→カテゴリ選択→図鑑追加→週間チャレンジ→共有を優先する", "high"),
+        task("photo-gotcha-table", "Phase 1.5: Gotcha比較表を作る", "項目は、対象ユーザー、主な体験、対象生物、SNS性、AI依存度、収益化、地域性、差別化ポイント", "mid"),
+        task("photo-gotcha-ui", "Phase 1.5: Gotcha風に見えすぎないUI方針を決める", "ポケモン風/海外アプリ風に寄せすぎず、日本の散歩・ガチャ・図鑑・チャレンジ感を出す", "high"),
+        task("photo-gotcha-share", "Phase 1.5: Gotchaリサーチ結果をChatGPT連携テキストに出るようにする", "競合から学んだこと、真似しないこと、差別化方針が進捗共有に含まれるようにする", "mid"),
+        task("photo-3d-direction", "Phase X: 3D感/浮遊感の方向性を言語化する", "「切り抜き図鑑」ではなく「浮かぶコレクション図鑑」。Gotchaは参考事例だが、こちらは立体感のある収集物体験を目指す", "high"),
+        task("photo-3d-reference", "Phase X: 参考にする演出を整理する", "浮遊カード、パララックス、影、レイヤー分離、出現アニメーション", "mid"),
+        task("photo-3d-no-copy", "Phase X: 参考にしない表現を整理する", "GotchaのUIやブランド表現を直接真似しない", "high"),
+        task("photo-3d-priority", "Phase X: MVP後に追加する演出の優先順位を決める", "1.浮遊カード 2.レア度演出 3.出現演出 4.パララックス 5.展示棚UI", "mid"),
+        task("photo-3d-card", "Phase X: 図鑑カードの3Dっぽい見せ方を考える", "生き物が背景から少し前に出ているように見せる", "mid"),
+        task("photo-3d-rare", "Phase X: レア生物の特別演出を考える", "光、影、オーラ、きらめき、バッジ演出など", "mid"),
+        task("photo-3d-found", "Phase X: 発見時アニメーションを考える", "撮影後に「みっけ！」→ 生き物がふわっと出現 → カード化", "mid"),
+        task("photo-3d-gallery", "Phase X: 図鑑一覧ではなく“コレクション展示”の案を考える", "棚、カプセル、浮遊表示、カテゴリごとの展示感", "mid"),
+        task("photo-3d-future", "Phase X: 将来的な本格3D化の条件を考える", "ユーザー反応が良い時だけ検討。本物の3Dモデル化は後回し", "mid"),
+        task("photo-p2-screens", "Phase 2: MVPで絶対に必要な画面を決める", "ホーム / 撮影 / カテゴリ選択 / 図鑑一覧 / カード詳細 / チャレンジ", "high"),
+        task("photo-p2-out", "Phase 2: MVPでやらない機能を決める", "AI高精度判定、AR、3Dモデル生成、重い3D処理、3Dモデル化、全国ランキング、課金、DM、フレンド", "high"),
+        task("photo-p2-card", "Phase 2: 図鑑カードの項目を決める", "写真、カテゴリ、名前、レア度、日付、ざっくり場所、コメント、チャレンジ参加", "mid"),
+        task("photo-p2-rare", "Phase 2: レア度ルールを仮決めする", "最初は手動/カテゴリ別固定でOK。C/B/A/Sなど", "mid"),
+        task("photo-p2-challenge", "Phase 2: チャレンジ仕様を決める", "週替わりテーマ、投稿、投票、1位バッジ", "mid"),
+        task("photo-p2-no-ai", "Phase 2: AIなしで成立する操作フローを書く", "撮影 → ユーザーがカテゴリ選択 → カード保存 → 図鑑に追加", "high"),
+        task("photo-p2-ai-future", "Phase 2: 将来のAI導入方針を書く", "最初はAIなし。次にオンデバイスAI。詳細判定だけチケット制クラウドAI", "mid"),
+        task("photo-p3-expo-prompt", "Phase 3: Expoプロジェクト作成用のプロンプトを作る", "", "mid"),
+        task("photo-p3-home", "Phase 3: ホーム画面のモックを作る", "今日のみっけ、今週のチャレンジ、図鑑進捗", "mid"),
+        task("photo-p3-camera", "Phase 3: 撮影画面のモックを作る", "カメラ起動、撮影ボタン、撮影後プレビュー", "mid"),
+        task("photo-p3-category", "Phase 3: カテゴリ選択画面のモックを作る", "猫/犬/鳥/虫/爬虫類/両生類/その他", "mid"),
+        task("photo-p3-list", "Phase 3: 図鑑一覧画面のモックを作る", "カード一覧、未発見枠、カテゴリフィルタ", "mid"),
+        task("photo-p3-detail", "Phase 3: カード詳細画面のモックを作る", "写真、名前、レア度、日付、場所、コメント", "mid"),
+        task("photo-p3-challenge", "Phase 3: チャレンジ画面のモックを作る", "今週のお題、投稿一覧、投票", "mid"),
+        task("photo-p4-expo", "Phase 4: Expoでアプリ雛形を作る", "", "mid"),
+        task("photo-p4-camera", "Phase 4: カメラ/画像選択の動作確認をする", "", "mid"),
+        task("photo-p4-preview", "Phase 4: 撮った写真をアプリ内で表示する", "", "mid"),
+        task("photo-p4-save-category", "Phase 4: カテゴリ選択を保存できるようにする", "", "mid"),
+        task("photo-p4-save-card", "Phase 4: 図鑑カードをローカル保存する", "", "mid"),
+        task("photo-p4-list-card", "Phase 4: 図鑑一覧にカードを表示する", "", "mid"),
+        task("photo-p4-challenge", "Phase 4: チャレンジ投稿風の画面を作る", "", "mid"),
+        task("photo-p4-chatgpt", "Phase 4: ChatGPTに進捗共有できるメモを残す", "", "mid"),
+        task("photo-p5-test-friends", "Phase 5: 友達/知り合いに触ってもらう", "", "mid"),
+        task("photo-p5-10people", "Phase 5: 10人に「撮って集めるのが楽しいか」を聞く", "", "mid"),
+        task("photo-p5-photo-count", "Phase 5: 1週間で何枚撮られるかを見る", "", "mid"),
+        task("photo-p5-category", "Phase 5: どのカテゴリが一番撮られるか見る", "", "mid"),
+        task("photo-p5-challenge", "Phase 5: チャレンジのお題で投稿が増えるか見る", "", "mid"),
+        task("photo-p5-no-ai", "Phase 5: AIなしでも遊べるか確認する", "", "mid"),
+        task("photo-p5-boring", "Phase 5: つまらないポイントを洗い出す", "", "mid"),
+        task("photo-p5-ui", "Phase 5: UIで迷う場所を直す", "", "mid"),
+        task("photo-p6-x", "Phase 6: X用の紹介文を作る", "", "mid"),
+        task("photo-p6-video", "Phase 6: TikTok/Instagram Reels向けの短い動画ネタを作る", "", "mid"),
+        task("photo-p6-template", "Phase 6: 「今日のみっけ」投稿テンプレを作る", "", "mid"),
+        task("photo-p6-cat", "Phase 6: 猫好きに刺さる投稿を作る", "", "mid"),
+        task("photo-p6-local", "Phase 6: 地域ネタの投稿を作る", "", "mid"),
+        task("photo-p6-weekly", "Phase 6: 週間チャレンジをSNSで告知する", "", "mid"),
+        task("photo-p6-reflect", "Phase 6: 初期ユーザーの投稿をアプリ内に反映する方法を考える", "", "mid"),
+        task("photo-p7-free-paid", "Phase 7: 無料版と有料版の差を決める", "保存数、限定バッジ、広告非表示、高精度判定、プロフィール装飾", "mid"),
+        task("photo-p7-subscription", "Phase 7: 月額300〜500円で成立する特典を考える", "", "mid"),
+        task("photo-p7-ticket", "Phase 7: 鑑定チケット制を検討する", "詳しい種類判定だけクラウドAIを使う", "mid"),
+        task("photo-p7-limited", "Phase 7: 限定チャレンジ/限定バッジを考える", "", "mid"),
+        task("photo-p7-collab", "Phase 7: 動物園/水族館/地域観光とのコラボ案を考える", "", "mid"),
+        task("photo-p7-goods", "Phase 7: フォトブック/ステッカー/グッズ化を検討する", "", "mid"),
+        task("photo-p7-ads", "Phase 7: 広告を入れるならどこに入れるか決める", "体験を壊さない場所だけ", "mid"),
+        task("photo-p8-store", "Phase 8: App Store公開に必要なものをリスト化する", "", "mid"),
+        task("photo-p8-privacy", "Phase 8: プライバシーポリシー草案を作る", "", "mid"),
+        task("photo-p8-terms", "Phase 8: 利用規約草案を作る", "", "mid"),
+        task("photo-p8-photo-location", "Phase 8: 位置情報/写真の取り扱い説明を書く", "", "mid"),
+        task("photo-p8-screenshots", "Phase 8: スクリーンショットを用意する", "", "mid"),
+        task("photo-p8-copy", "Phase 8: アプリ紹介文を作る", "", "mid"),
+        task("photo-p8-testflight", "Phase 8: TestFlightでテストする", "", "mid"),
+        task("photo-p8-freeze", "Phase 8: 初期リリースの機能を固定する", "", "mid"),
+        task("photo-p9-retention", "Phase 9: 継続率を見る", "", "mid"),
+        task("photo-p9-count", "Phase 9: 1人あたりの撮影枚数を見る", "", "mid"),
+        task("photo-p9-challenge-rate", "Phase 9: チャレンジ参加率を見る", "", "mid"),
+        task("photo-p9-share-rate", "Phase 9: SNS共有率を見る", "", "mid"),
+        task("photo-p9-pay-click", "Phase 9: 課金導線のクリック率を見る", "", "mid"),
+        task("photo-p9-popular", "Phase 9: 人気カテゴリを強化する", "", "mid"),
+        task("photo-p9-remove", "Phase 9: 不人気機能を削る", "", "mid"),
+        task("photo-p9-ai", "Phase 9: AI判定を入れるか判断する", "", "mid"),
+        task("photo-v1-floating", "将来フェーズ: v1で浮遊カード演出を追加する", "本物の3Dではなく、CSS/React Nativeの影・レイヤー・軽いアニメーションで3Dっぽく見せる", "mid"),
+        task("photo-v1-rare", "将来フェーズ: v1でレア度ごとの見た目差を追加する", "光、影、オーラ、きらめき、バッジなどで収集物っぽさを強める", "mid"),
+        task("photo-v2-parallax", "将来フェーズ: v2でパララックス演出を検討する", "端末傾きやスクロールでカードに奥行きを出す。重くなるならやらない", "mid"),
+        task("photo-v2-gallery", "将来フェーズ: v2でコレクション展示UIを検討する", "棚、カプセル、浮遊表示、カテゴリごとの展示感", "mid"),
+        task("photo-v3-real-3d", "将来フェーズ: v3で本格3D化の必要性を判断する", "ユーザー反応と継続率が良い場合のみ検討。本物の3Dモデル自動生成は後回し", "mid")
+      ]
+    },
+    {
+      id: "p-toolnav",
+      name: "工具ナビ（3DP含む）",
+      status: "収益化候補 / リサーチ開始",
+      mission: "車・DIY・整備・3Dプリント周辺で、「この作業にはどの工具が必要か」「代用品は何か」「3Dプリントで作れる治具はあるか」を調べられる工具ナビを作る。最初はアプリではなく、検索流入とアフィリエイト、3DPデータ販売、工具キット化まで狙える情報資産として始める。",
+      nextAction: "車DIY/整備/3DPで困っている作業を50個リスト化し、それぞれに必要工具、代用品、危険ポイント、アフィリエイト候補、3DP化できる治具を整理する。",
+      costLimit: "月0円スタート。最初はGitHub Pagesや静的サイト、スプレッドシート、記事化で検証。商品購入やサーバー課金は後回し。",
+      link: "",
+      tasks: [
+        task("tool-p0-concept", "Phase 0: 工具ナビの一言コンセプトを決める", "例「作業名から必要工具・代用品・3DP治具・買うべき物がわかるナビ」", "high"),
+        task("tool-p0-genre", "Phase 0: 対象ジャンルを決める", "車整備、バイク整備、3Dプリント治具、DIY工具、ガレージ用品", "high"),
+        task("tool-p0-target", "Phase 0: 最初のターゲットを決める", "初心者DIY、車好き、3Dプリンタ持ち、工具を揃えたい人、旧車乗り", "mid"),
+        task("tool-p0-3dp-scope", "Phase 0: 3DPをどこまで扱うか決める", "内装クリップ、位置決め治具、ホルダー、測定補助具、テンプレート、収納など", "mid"),
+        task("tool-p0-3dp-ng", "Phase 0: 安全上扱わない3DP部品を決める", "ブレーキ、ステアリング、足回り、強度が必要な保安部品は基本NG/注意喚起", "high"),
+        task("tool-p0-site-app", "Phase 0: 工具ナビをアプリにするかサイトにするか仮決めする", "最初は静的サイト/管理データでOK。反応があればPWA化", "mid"),
+        task("tool-p1-categories", "Phase 1: 需要のある作業カテゴリを洗い出す", "オイル交換、ブレーキパッド、バッテリー、内装外し、電装、足回り、3DP補修", "high"),
+        task("tool-p1-50-pains", "Phase 1: 車DIYでよく検索される困りごとを50個集める", "「工具 何が必要」「外れない」「サイズ」「トルク」「代用」「専用工具」", "high"),
+        task("tool-p1-community", "Phase 1: みんカラ/X/YouTubeコメント/掲示板/知恵袋で困りごとを探す", "", "mid"),
+        task("tool-p1-review", "Phase 1: Amazon/楽天/Yahoo等の商品レビューから不満を集める", "壊れる、サイズが合わない、安物買いの失敗、収納に困る", "mid"),
+        task("tool-p1-3dp-30", "Phase 1: 3Dプリントで解決できそうな困りごとを30個集める", "クリップ、スペーサー、治具、ガイド、ケース、ホルダー、測定補助", "mid"),
+        task("tool-p1-discontinued", "Phase 1: 廃盤部品と3DP代替の可能性を調べる", "ただし安全性/権利/強度に注意", "mid"),
+        task("tool-p1-affiliate", "Phase 1: アフィリエイトで紹介しやすい商品カテゴリを洗い出す", "工具セット、トルクレンチ、ジャッキ、ウマ、内装剥がし、テスター、フィラメント", "mid"),
+        task("tool-p1-price", "Phase 1: 単価が高い商品と買われやすい商品を分ける", "高単価=工具セット/ジャッキ、低単価=内装剥がし/クリップ/フィラメント等", "mid"),
+        task("tool-p1-competitor", "Phase 1: 競合サイト/YouTube/ブログを調べる", "どこが弱いか、初心者に分かりにくい点を探す", "mid"),
+        task("tool-p2-work-data", "Phase 2: 作業データの項目を決める", "作業名、難易度、必要工具、あると便利、消耗品、危険ポイント、想定時間", "high"),
+        task("tool-p2-tool-data", "Phase 2: 工具データの項目を決める", "工具名、用途、サイズ、価格帯、代用品、失敗しやすい選び方、購入候補", "high"),
+        task("tool-p2-3dp-data", "Phase 2: 3DPデータの項目を決める", "作れる物、用途、推奨素材、強度注意、印刷時間、STL有無、販売可否", "mid"),
+        task("tool-p2-aff-data", "Phase 2: アフィリエイト管理項目を決める", "商品名、リンク、単価、想定CV、優先度、紹介記事", "mid"),
+        task("tool-p2-safety", "Phase 2: 安全注意テンプレを作る", "ジャッキアップ、ブレーキ、電装、トルク管理、保安部品", "high"),
+        task("tool-p2-search", "Phase 2: 工具ナビの検索カテゴリを決める", "作業から探す / 工具から探す / 3DPで作る / 初心者セット / 車種別", "mid"),
+        task("tool-p3-work-50", "Phase 3: 作業50個のリストを作る", "", "high"),
+        task("tool-p3-tool-100", "Phase 3: 工具100個のリストを作る", "", "high"),
+        task("tool-p3-3dp-30", "Phase 3: 3DPで作れる候補30個のリストを作る", "", "mid"),
+        task("tool-p3-beginner-set", "Phase 3: 初心者が最初に買うべき工具セットを作る", "", "mid"),
+        task("tool-p3-safety-set", "Phase 3: 車整備の最低限安全セットを作る", "ジャッキ、ウマ、輪止め、手袋、保護メガネなど", "high"),
+        task("tool-p3-material", "Phase 3: 3DP初心者向けの推奨素材を整理する", "PLA/PETG/ASA/PA系など。用途別に注意を書く", "mid"),
+        task("tool-p3-3dp-ok-ng", "Phase 3: 3DPで作っていいもの/ダメなものリストを作る", "", "high"),
+        task("tool-p3-title-20", "Phase 3: 最初の記事タイトルを20個作る", "", "mid"),
+        task("tool-p3-card-30", "Phase 3: 最初の工具カードを30個作る", "", "mid"),
+        task("tool-p4-static", "Phase 4: GitHub Pagesで動く静的な工具ナビページを作る", "", "mid"),
+        task("tool-p4-search", "Phase 4: 作業名で検索できるようにする", "", "mid"),
+        task("tool-p4-filter", "Phase 4: 工具カテゴリでフィルタできるようにする", "", "mid"),
+        task("tool-p4-3dp-filter", "Phase 4: 3DP治具だけ絞り込めるようにする", "", "mid"),
+        task("tool-p4-work-page", "Phase 4: 各作業ページに必要工具一覧を表示する", "", "mid"),
+        task("tool-p4-tool-page", "Phase 4: 各工具ページに用途/選び方/注意/購入候補を表示する", "", "mid"),
+        task("tool-p4-3dp-page", "Phase 4: 3DPページに推奨素材/注意点/印刷設定メモを表示する", "", "mid"),
+        task("tool-p4-aff-dummy", "Phase 4: アフィリエイトリンクは最初ダミーでもOKにする", "", "mid"),
+        task("tool-p4-json", "Phase 4: データをJSONで管理できるようにする", "", "mid"),
+        task("tool-p4-chatgpt", "Phase 4: ChatGPTに渡せる進捗/商品リストを書き出せるようにする", "", "mid"),
+        task("tool-p5-work-template", "Phase 5: 作業別の記事テンプレを作る", "結論、必要工具、代用品、手順概要、注意、購入候補、3DP候補", "mid"),
+        task("tool-p5-tool-template", "Phase 5: 工具別の記事テンプレを作る", "何に使う、サイズの選び方、安物の注意、買うならどれ", "mid"),
+        task("tool-p5-3dp-template", "Phase 5: 3DP治具の記事テンプレを作る", "何を解決する、素材、強度、印刷時間、STL、注意点", "mid"),
+        task("tool-p5-10", "Phase 5: まず10記事分の構成を作る", "", "mid"),
+        task("tool-p5-photo", "Phase 5: 写真が必要な記事をリスト化する", "", "mid"),
+        task("tool-p5-own-photo", "Phase 5: 自分で撮れる写真とネット調査だけで書ける記事を分ける", "", "mid"),
+        task("tool-p5-video", "Phase 5: YouTubeショート/TikTok用のネタに変換する", "", "mid"),
+        task("tool-p5-x", "Phase 5: X投稿用の短文に変換する", "", "mid"),
+        task("tool-p6-seo", "Phase 6: SEO向けキーワードを整理する", "「作業名 + 工具」「車種 + 工具」「3Dプリント + 治具」「代用」", "mid"),
+        task("tool-p6-x-30", "Phase 6: Xで毎日投稿するネタを30個作る", "", "mid"),
+        task("tool-p6-short-10", "Phase 6: YouTube Shorts/TikTok用に工具ネタを10個作る", "", "mid"),
+        task("tool-p6-before-after", "Phase 6: 3DP作品のBefore/After投稿を作る", "", "mid"),
+        task("tool-p6-failure", "Phase 6: 失敗談コンテンツを作る", "安物工具で失敗、サイズ違い、3DP素材選びミス", "mid"),
+        task("tool-p6-weekly", "Phase 6: 検索流入用の記事を週1本出す計画を作る", "", "mid"),
+        task("tool-p6-route", "Phase 6: SNSから工具ナビに飛ばす導線を作る", "", "mid"),
+        task("tool-p6-search-console", "Phase 6: Google Search Consoleなど計測の準備をする", "", "mid"),
+        task("tool-p7-aff-candidates", "Phase 7: アフィリエイト候補を洗い出す", "Amazon、楽天、Yahoo、工具専門店、3DP用品など。利用条件は最新情報を確認", "mid"),
+        task("tool-p7-products-20", "Phase 7: まず紹介しやすい商品を20個選ぶ", "", "mid"),
+        task("tool-p7-price-split", "Phase 7: 高単価工具と低単価消耗品を分ける", "", "mid"),
+        task("tool-p7-beginner-page", "Phase 7: 「初心者工具セット」ページを作る", "", "mid"),
+        task("tool-p7-3dp-starter", "Phase 7: 「3DPスターターセット」ページを作る", "", "mid"),
+        task("tool-p7-shopping-list", "Phase 7: 「作業別買い物リスト」ページを作る", "", "mid"),
+        task("tool-p7-stl", "Phase 7: 3DP STLデータ販売を検討する", "BOOTH、note、Gumroad等。利用条件は最新情報を確認", "mid"),
+        task("tool-p7-product", "Phase 7: 3DP完成品販売を検討する", "小物、治具、ホルダー、収納。強度部品は避ける", "mid"),
+        task("tool-p7-kit", "Phase 7: 工具キット化を検討する", "作業別セット、初心者セット、内装剥がしセットなど", "mid"),
+        task("tool-p7-pdf", "Phase 7: 有料PDF/チェックリスト販売を検討する", "初心者工具リスト、作業前チェックリスト、3DP素材選び表", "mid"),
+        task("tool-p7-sponsor", "Phase 7: スポンサー枠を検討する", "工具メーカー、3DPフィラメント、ショップ", "mid"),
+        task("tool-p7-revenue", "Phase 7: 収益管理表を作る", "記事、リンク、クリック、売上、CV、改善メモ", "mid"),
+        task("tool-p8-maintenance-note", "Phase 8: 整備情報の注意書きを作る", "作業は自己責任、重要保安部品は専門家へ、トルク値は整備書確認", "high"),
+        task("tool-p8-3dp-note", "Phase 8: 3DP部品の注意書きを作る", "強度/耐熱/耐候/層間剥離/経年劣化に注意", "high"),
+        task("tool-p8-aff-note", "Phase 8: アフィリエイト表記を入れる", "", "mid"),
+        task("tool-p8-trademark", "Phase 8: 画像/メーカー名/商標の扱いを確認する", "", "mid"),
+        task("tool-p8-compatible", "Phase 8: 互換部品や代替品の表現に注意する", "", "mid"),
+        task("tool-p8-correction", "Phase 8: 誤情報を直す更新フローを作る", "", "mid"),
+        task("tool-p8-source", "Phase 8: 参考元をメモできる欄を作る", "", "mid"),
+        task("tool-p9-click", "Phase 9: クリック率を見る", "", "mid"),
+        task("tool-p9-sales", "Phase 9: どの記事から売れているか見る", "", "mid"),
+        task("tool-p9-rewrite", "Phase 9: 売れない記事を修正する", "", "mid"),
+        task("tool-p9-keyword", "Phase 9: 検索キーワードを見て記事を追加する", "", "mid"),
+        task("tool-p9-category", "Phase 9: よく見られる作業カテゴリを強化する", "", "mid"),
+        task("tool-p9-3dp-demand", "Phase 9: 3DPデータの需要を見る", "", "mid"),
+        task("tool-p9-sns", "Phase 9: SNSで反応が良いネタを記事化する", "", "mid"),
+        task("tool-p9-pwa", "Phase 9: アプリ化/PWA化する価値があるか判断する", "", "mid"),
+        task("tool-p9-revenue-goal", "Phase 9: 月1万円、月3万円、月10万円の収益目標に分けて改善する", "", "mid")
+      ]
+    },
+    {
+      id: "p-carapp",
+      name: "車アプリ開発",
+      status: "整理中",
+      mission: "アライメント、メンテ記録、バネレート/固有振動数など、実際にアプリとして作る車系プロダクトを管理する。",
+      nextAction: "工具ナビと混ざらないように境界を決め、最初に作る車アプリを1つに絞る",
+      costLimit: "追加サーバーなし。PWA/ローカル保存で検証",
+      link: "",
+      tasks: [
+        task("carapp-boundary", "工具ナビと車アプリ開発の境界を明文化する", "工具ナビ = 情報資産/検索流入/アフィリエイト/3DP販売寄り。車アプリ開発 = 測定・記録・計算などのアプリ本体寄り", "high"),
+        task("carapp-alignment", "アライメントアプリ案を別タスクに分ける", "測定、記録、比較、調整メモなど", "mid"),
+        task("carapp-maintenance", "メンテ記録アプリ案を別タスクに分ける", "整備履歴、距離、費用、次回交換目安など", "mid"),
+        task("carapp-spring", "バネレート/固有振動数アプリ案を別タスクに分ける", "計算、測定、車両設定メモなど", "mid"),
+        task("carapp-first-one", "最初に作る車アプリを1つに絞る", "作りやすさ × 欲しい人の強さ × 課金可能性で判断する", "high")
       ]
     },
     {
@@ -30,25 +241,10 @@ const defaultState = {
       costLimit: "月0円。まずは調査と記事/投稿だけ",
       link: "",
       tasks: [
-        { id: makeId(), title: "対象車種を絞る", note: "S2000 / M2 / 旧車 / 国産スポーツなど", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "廃盤で困ってる部品を20個集める", note: "ヤフオク、みんカラ、X、掲示板、ショップ情報", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "アフィリエイト候補を調べる", note: "工具、消耗品、代替部品、3Dプリント素材", status: "todo", priority: "mid", due: "" },
-        { id: makeId(), title: "1記事目の構成を作る", note: "例：S2000で廃盤になりやすい部品まとめ", status: "todo", priority: "mid", due: "" }
-      ]
-    },
-    {
-      id: "p-carapp",
-      name: "車アプリ開発",
-      status: "整理中",
-      mission: "アライメント、メンテ記録、バネ/固有振動数などの車系アプリを切り分ける",
-      nextAction: "どれを最初に作るか1個に絞る",
-      costLimit: "追加サーバーなし。PWA/ローカル保存で検証",
-      link: "",
-      tasks: [
-        { id: makeId(), title: "候補機能を分ける", note: "アライメント / メンテ記録 / バネレート計算 / 固有振動数測定", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "一番売れそうな順に並べる", note: "作りやすさ × 欲しい人の強さ × 課金可能性", status: "todo", priority: "high", due: "" },
-        { id: makeId(), title: "既存GitHubやメモのリンクを貼る", note: "探す時間を減らす", status: "todo", priority: "mid", due: "" },
-        { id: makeId(), title: "1つだけMVP仕様を書く", note: "最初から全部入りにしない", status: "todo", priority: "mid", due: "" }
+        task("affiliate-car-model", "対象車種を絞る", "S2000 / M2 / 旧車 / 国産スポーツなど", "high"),
+        task("affiliate-discontinued-20", "廃盤で困ってる部品を20個集める", "ヤフオク、みんカラ、X、掲示板、ショップ情報", "high"),
+        task("affiliate-products", "アフィリエイト候補を調べる", "工具、消耗品、3Dプリント素材。工具ナビとは混ぜず、廃盤部品文脈に寄せる", "mid"),
+        task("affiliate-first-article", "1記事目の構成を作る", "例：S2000で廃盤になりやすい部品まとめ", "mid")
       ]
     }
   ]
@@ -67,22 +263,114 @@ function makeId() {
 function load() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return structuredClone(defaultState);
+    if (!saved) return normalizeState(structuredClone(defaultState));
     const parsed = JSON.parse(saved);
-    return normalizeState(parsed);
+    const migrated = normalizeState(migrateState(parsed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    return migrated;
   } catch {
-    return structuredClone(defaultState);
+    return normalizeState(structuredClone(defaultState));
   }
+}
+
+function migrateState(savedState) {
+  const base = structuredClone(defaultState);
+  if (!savedState || typeof savedState !== "object") return base;
+
+  const savedProjects = Array.isArray(savedState.projects) ? savedState.projects : [];
+  const canonicalIds = new Set(base.projects.map(p => p.id));
+  const usedSavedProjects = new Set();
+
+  const aliases = {
+    "p-photo": ["p-photo", "p-mikke"],
+    "p-toolnav": ["p-toolnav"],
+    "p-carapp": ["p-carapp"],
+    "p-affiliate": ["p-affiliate"]
+  };
+
+  const migratedProjects = base.projects.map(defaultProject => {
+    const candidates = aliases[defaultProject.id] || [defaultProject.id];
+    const savedProject = savedProjects.find(p =>
+      candidates.includes(p.id) ||
+      (defaultProject.id === "p-photo" && /みっけ|写真図鑑/.test(p.name || "")) ||
+      (defaultProject.id === "p-toolnav" && /工具ナビ/.test(p.name || ""))
+    );
+
+    if (!savedProject) return defaultProject;
+    usedSavedProjects.add(savedProject);
+
+    return {
+      ...savedProject,
+      id: defaultProject.id,
+      name: defaultProject.name,
+      status: defaultProject.status,
+      mission: defaultProject.mission,
+      nextAction: defaultProject.nextAction,
+      costLimit: defaultProject.costLimit,
+      link: savedProject.link || defaultProject.link,
+      tasks: mergeTasks(defaultProject.tasks, savedProject.tasks || [])
+    };
+  });
+
+  const customProjects = savedProjects
+    .filter(p => !usedSavedProjects.has(p))
+    .filter(p => !canonicalIds.has(p.id) && p.id !== "p-mikke")
+    .map(p => ({ ...p, tasks: Array.isArray(p.tasks) ? p.tasks : [] }));
+
+  const selectedProjectId = savedState.selectedProjectId === "p-mikke"
+    ? "p-photo"
+    : (migratedProjects.some(p => p.id === savedState.selectedProjectId) ? savedState.selectedProjectId : base.selectedProjectId);
+
+  return {
+    ...base,
+    ...savedState,
+    dataVersion: DATA_VERSION,
+    selectedProjectId,
+    projects: [...migratedProjects, ...customProjects]
+  };
+}
+
+function mergeTasks(defaultTasks, savedTasks) {
+  const savedById = new Map(savedTasks.filter(t => t?.id).map(t => [t.id, t]));
+  const savedByTitle = new Map(savedTasks.filter(t => t?.title).map(t => [t.title, t]));
+  const usedSavedTasks = new Set();
+
+  const merged = defaultTasks.map(defaultTask => {
+    const savedTask = savedById.get(defaultTask.id) || savedByTitle.get(defaultTask.title);
+    if (savedTask) usedSavedTasks.add(savedTask);
+    return {
+      ...defaultTask,
+      status: savedTask?.status || defaultTask.status,
+      due: savedTask?.due || defaultTask.due,
+      priority: savedTask?.priority || defaultTask.priority,
+      note: defaultTask.note || savedTask?.note || ""
+    };
+  });
+
+  const customTasks = savedTasks
+    .filter(t => !usedSavedTasks.has(t))
+    .filter(t => t?.title && !defaultTasks.some(d => d.id === t.id || d.title === t.title));
+
+  return [...merged, ...customTasks];
 }
 
 function normalizeState(s) {
   const d = structuredClone(defaultState);
   const merged = { ...d, ...s };
+  merged.dataVersion = DATA_VERSION;
   if (!Array.isArray(merged.projects)) merged.projects = d.projects;
   merged.projects.forEach(p => {
+    p.id ||= makeId();
+    p.name ||= "無題プロジェクト";
+    p.status ||= "";
+    p.mission ||= "";
+    p.nextAction ||= "";
+    p.costLimit ||= "";
+    p.link ||= "";
     if (!Array.isArray(p.tasks)) p.tasks = [];
     p.tasks.forEach(t => {
       t.id ||= makeId();
+      t.title ||= "無題タスク";
       t.status ||= "todo";
       t.priority ||= "mid";
       t.note ||= "";
