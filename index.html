@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>Project Control Mini v2</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PROJECT CONTROL</p>
+        <h1>進捗をダーッと見るやつ</h1>
+      </div>
+      <button id="exportBtn" class="ghost">JSONバックアップ</button>
+    </header>
+
+    <section class="summary">
+      <div class="summary-card">
+        <span id="projectCount">0</span>
+        <small>プロジェクト</small>
+      </div>
+      <div class="summary-card">
+        <span id="activeTaskCount">0</span>
+        <small>未完了タスク</small>
+      </div>
+      <div class="summary-card">
+        <span id="doneRate">0%</span>
+        <small>全体進捗</small>
+      </div>
+    </section>
+
+    <section class="panel sticky-panel">
+      <div class="panel-head">
+        <h2>ChatGPT連携</h2>
+        <button id="copyForChatGPTBtn" class="primary small">コピー</button>
+      </div>
+      <p class="hint">
+        チェックした内容をChatGPTに伝える用の文章を自動生成します。コピーしてこのチャットに貼れば、次の相談でその状態を前提にできます。
+      </p>
+      <textarea id="chatgptPayload" readonly></textarea>
+      <div class="row gap">
+        <button id="downloadProgressBtn" class="ghost">進捗TXT保存</button>
+        <button id="selectPayloadBtn" class="ghost">選択</button>
+      </div>
+    </section>
+
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>全プロジェクト進捗</h2>
+          <button id="addProjectBtn" class="primary small">プロジェクト追加</button>
+        </div>
+        <div id="progressBoard" class="progress-board"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>編集するプロジェクト</h2>
+        </div>
+        <div id="projectTabs" class="tabs"></div>
+      </section>
+
+      <section id="projectEditor" class="panel"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>選択中プロジェクトのタスク</h2>
+          <button id="addTaskBtn" class="primary small">タスク追加</button>
+        </div>
+
+        <div class="filters">
+          <button class="filter active" data-filter="all">全部</button>
+          <button class="filter" data-filter="todo">未着手</button>
+          <button class="filter" data-filter="doing">作業中</button>
+          <button class="filter" data-filter="done">完了</button>
+        </div>
+
+        <div id="taskList" class="task-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>全体メモ</h2>
+        <textarea id="globalMemo" placeholder="迷ったこと、あとで考えること、思いついたアイデアを書いておく"></textarea>
+      </section>
+
+      <section class="panel danger-zone">
+        <h2>データ</h2>
+        <div class="row gap">
+          <label class="file-label">
+            JSONインポート
+            <input id="importFile" type="file" accept="application/json" />
+          </label>
+          <button id="resetBtn" class="danger">初期化</button>
+        </div>
+        <p class="hint">データはこの端末のブラウザ内に保存。サーバーには送信しません。</p>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="taskDialog">
+    <form method="dialog" id="taskForm">
+      <h2 id="taskDialogTitle">タスク追加</h2>
+      <input id="taskTitle" required placeholder="タスク名 例：ホーム画面モックを作る" />
+      <textarea id="taskNote" placeholder="メモ"></textarea>
+      <div class="grid2">
+        <label>状態
+          <select id="taskStatus">
+            <option value="todo">未着手</option>
+            <option value="doing">作業中</option>
+            <option value="done">完了</option>
+          </select>
+        </label>
+        <label>優先度
+          <select id="taskPriority">
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
+          </select>
+        </label>
+      </div>
+      <label>期限
+        <input id="taskDue" type="date" />
+      </label>
+      <menu>
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button id="saveTaskBtn" value="default" class="primary">保存</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>
