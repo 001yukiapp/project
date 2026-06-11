@@ -1,6 +1,6 @@
 const STORAGE_KEY = "project-control-mini-v2";
 const DATA_VERSION = 6;
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.2.1";
 const APP_UPDATED_AT = "2026-06-11";
 
 function task(id, title, note = "", priority = "mid") {
@@ -1849,7 +1849,7 @@ $("resetBtn").onclick = () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register(`./sw.js?v=${APP_VERSION}`).catch(() => {});
   });
 }
 
