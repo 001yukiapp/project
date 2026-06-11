@@ -656,6 +656,7 @@ function renderProjectNode(project) {
   const blocked = openTasks.filter(t => t.isBlocked).length;
   const projectOpen = state.ui.openProjects[project.id] !== false;
   const phases = groupTasksByPhase(project).filter(phase => phase.tasks.some(taskMatchesTreeFilter));
+  const previewTasks = projectNextTasks(project, 5).filter(taskMatchesTreeFilter);
   return `
     <article class="tree-project">
       <button class="tree-project-head" onclick="toggleProjectOpen('${project.id}')">
@@ -673,7 +674,67 @@ function renderProjectNode(project) {
         </div>
       </button>
       <div class="progressbar"><span style="width:${projectRate(project)}%"></span></div>
+      <div class="project-next">
+        <div class="project-next-head">
+          <span>次にやること</span>
+          <small>${openTasks.length ? `未完了 ${openTasks.length}件から優先表示` : "未完了なし"}</small>
+        </div>
+        ${previewTasks.length ? `
+          <div class="project-next-list">
+            ${previewTasks.map(t => renderProjectNextTask(project, t)).join("")}
+          </div>
+        ` : `<p class="empty compact-empty">条件に合うやることなし</p>`}
+      </div>
       ${projectOpen ? `<div class="phase-list">${phases.map(phase => renderPhaseNode(project, phase)).join("") || `<p class="empty">条件に合うタスクなし</p>`}</div>` : ""}
+    </article>
+  `;
+}
+
+function projectNextTasks(project, limit = 5) {
+  return [...(project.tasks || [])]
+    .filter(t => t.status !== "done")
+    .sort(compareTasksForAction)
+    .slice(0, limit);
+}
+
+function compareTasksForAction(a, b) {
+  const score = t => {
+    const priority = ({ high: 35, mid: 20, low: 8 })[t.priority] || 10;
+    const status = ({ doing: 35, todo: 18, done: 0 })[t.status] || 12;
+    const due = t.due ? Math.max(0, 12 - daysUntil(t.due)) : 0;
+    return priority + status + (t.focus ? 60 : 0) + (t.isBlocked ? 45 : 0) + due;
+  };
+  return score(b) - score(a) || (a.phaseOrder ?? 0) - (b.phaseOrder ?? 0) || String(a.title).localeCompare(String(b.title), "ja");
+}
+
+function daysUntil(dateText) {
+  const date = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 99;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((date - today) / 86400000);
+}
+
+function renderProjectNextTask(project, task) {
+  return `
+    <article class="next-task ${task.focus ? "focus-task" : ""} ${task.isBlocked ? "blocked-task" : ""}">
+      <label class="next-task-main">
+        <input type="checkbox" onchange="toggleTaskDone('${project.id}', '${task.id}', this.checked)" />
+        <span>${escapeHtml(displayTaskTitle(task))}</span>
+      </label>
+      <div class="next-task-meta">
+        <span class="badge ${escapeAttr(task.priority)}">${priorityLabel(task.priority)}</span>
+        <span class="badge">${statusLabel(task.status)}</span>
+        <span class="badge">${escapeHtml(task.phaseTitle || "未分類")}</span>
+        ${task.due ? `<span class="badge">期限 ${escapeHtml(task.due)}</span>` : ""}
+        ${task.focus ? `<span class="badge focus">今日やる</span>` : ""}
+        ${task.isBlocked ? `<span class="badge blocked">詰まり中</span>` : ""}
+      </div>
+      <div class="next-task-actions">
+        <button onclick="setTaskStatus('${task.id}', 'doing', '${project.id}')" class="ghost">作業中</button>
+        <button onclick="setTaskFocus('${project.id}', '${task.id}')" class="ghost">${task.focus ? "今日やる解除" : "今日やる"}</button>
+        <button onclick="editTask('${task.id}', '${project.id}')" class="ghost">編集</button>
+      </div>
     </article>
   `;
 }
