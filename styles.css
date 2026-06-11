@@ -1,13 +1,13 @@
 :root {
   color-scheme: dark;
-  --bg: #0b1020;
-  --panel: #121a2d;
-  --panel2: #172136;
+  --bg: #0f1115;
+  --panel: #171b22;
+  --panel2: #202631;
   --text: #f4f7fb;
-  --muted: #93a4bd;
+  --muted: #9aa7b6;
   --line: rgba(255,255,255,.10);
-  --accent: #8b5cf6;
-  --accent2: #22c55e;
+  --accent: #4f8cff;
+  --accent2: #21c782;
   --danger: #ef4444;
   --warn: #f59e0b;
   --shadow: 0 18px 60px rgba(0,0,0,.35);
@@ -17,10 +17,7 @@
 html, body { margin: 0; min-height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(139,92,246,.24), transparent 35%),
-    radial-gradient(circle at top right, rgba(34,197,94,.16), transparent 32%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -38,7 +35,7 @@ button {
 button:active { transform: scale(.98); }
 
 .app {
-  width: min(1040px, 100%);
+  width: min(1120px, 100%);
   margin: 0 auto;
   padding: max(18px, env(safe-area-inset-top)) 16px 40px;
 }
@@ -60,11 +57,24 @@ button:active { transform: scale(.98); }
 
 h1 {
   margin: 0;
-  font-size: clamp(25px, 7vw, 42px);
+  font-size: clamp(29px, 6vw, 46px);
   line-height: 1.05;
 }
 
 h2 { margin: 0; font-size: 18px; }
+
+.version-label {
+  display: inline-flex;
+  width: fit-content;
+  margin: 10px 0 0;
+  border: 1px solid rgba(79,140,255,.34);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(79,140,255,.10);
+  color: #c7dcff;
+  font-size: 12px;
+  font-weight: 800;
+}
 
 .summary {
   display: grid;
@@ -335,37 +345,47 @@ input:focus, textarea:focus, select:focus {
   gap: 12px;
 }
 
+.project-tree {
+  gap: 16px;
+}
+
 .tree-project,
 .repo-card {
-  background: rgba(255,255,255,.05);
+  background: rgba(255,255,255,.045);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 13px;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.tree-project.open {
+  border-color: rgba(79,140,255,.34);
+  background: rgba(255,255,255,.06);
 }
 
 .tree-project-head,
 .tree-phase-head {
   width: 100%;
-  border-radius: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 12px;
-  padding: 10px;
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
   text-align: left;
-  background: rgba(255,255,255,.04);
+  background: rgba(255,255,255,.035);
 }
 
 .tree-phase-head {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .tree-title,
 .repo-name {
   margin: 0 0 5px;
   font-weight: 900;
-  font-size: 16px;
+  font-size: 20px;
 }
 
 .tree-sub,
@@ -373,23 +393,57 @@ input:focus, textarea:focus, select:focus {
 .repo-next {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.45;
+}
+
+.project-title-block {
+  min-width: 0;
+}
+
+.project-progress-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  background:
+    radial-gradient(circle at center, var(--panel) 57%, transparent 58%),
+    conic-gradient(var(--accent2) var(--rate), rgba(255,255,255,.12) 0);
+  border: 1px solid var(--line);
+}
+
+.project-progress-ring strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.project-progress-ring small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .tree-stats,
 .repo-meta,
 .repo-actions {
+  grid-column: 1 / -1;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .tree-toggle {
-  color: var(--text);
+  color: #c7dcff;
   font-size: 12px;
   font-weight: 800;
+}
+
+.project-progressbar {
+  margin: 12px 0 0;
 }
 
 .phase-progress { margin: 8px 0; }
@@ -472,6 +526,105 @@ input:focus, textarea:focus, select:focus {
 .compact-empty {
   padding: 12px;
   margin: 0;
+}
+
+.workflow {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 8px;
+  background: rgba(0,0,0,.14);
+}
+
+.workflow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-weight: 900;
+}
+
+.workflow-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-step {
+  position: relative;
+  padding-left: 16px;
+}
+
+.workflow-step::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: -12px;
+  width: 2px;
+  background: rgba(255,255,255,.12);
+}
+
+.workflow-step:last-child::before {
+  bottom: 12px;
+}
+
+.workflow-index {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #2c3442;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.workflow-step.complete .workflow-index {
+  background: var(--accent2);
+  color: #06130d;
+}
+
+.workflow-step.active .workflow-index {
+  background: var(--accent);
+  color: #fff;
+}
+
+.workflow-step.active .tree-phase-head {
+  border: 1px solid rgba(79,140,255,.42);
+  background: rgba(79,140,255,.10);
+}
+
+.workflow-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.workflow-title strong {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.workflow-title small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workflow-step.active .workflow-title small {
+  color: #c7dcff;
+}
+
+.workflow-meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .tree-task {
@@ -718,17 +871,39 @@ menu {
 }
 
 @media (max-width: 560px) {
-  .topbar { align-items: center; }
+  .topbar {
+    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
   .summary { grid-template-columns: 1fr 1fr 1fr; }
   .summary-card { padding: 12px 10px; }
   .summary-card span { font-size: 20px; }
   .grid2 { grid-template-columns: 1fr; }
   .panel { padding: 13px; border-radius: 18px; }
   .focus-card h2 { font-size: 20px; }
-  .tree-project-head,
-  .tree-phase-head,
-  .repo-head {
-    display: grid;
+  .tree-project-head {
+    grid-template-columns: 1fr;
+  }
+  .tree-phase-head {
+    grid-template-columns: 30px 1fr;
+  }
+  .workflow-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .project-progress-ring {
+    width: 64px;
+    height: 64px;
+  }
+  .project-progress-ring strong {
+    font-size: 16px;
+  }
+  .workflow {
+    padding: 12px 10px;
+  }
+  .workflow-step {
+    padding-left: 10px;
   }
   .project-next-head {
     display: grid;

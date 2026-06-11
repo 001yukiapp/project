@@ -1,5 +1,7 @@
 const STORAGE_KEY = "project-control-mini-v2";
 const DATA_VERSION = 6;
+const APP_VERSION = "2.2.0";
+const APP_UPDATED_AT = "2026-06-11";
 
 function task(id, title, note = "", priority = "mid") {
   return { id, title, note, status: "todo", priority, due: "" };
@@ -568,6 +570,7 @@ function currentProject() {
 function render() {
   if (!currentProject() && state.projects.length) state.selectedProjectId = state.projects[0].id;
 
+  renderAppVersion();
   renderSummary();
   renderFocusArea();
   renderProjectTree();
@@ -576,6 +579,11 @@ function render() {
 
   $("globalMemo").value = state.memo || "";
   updateChatGPTPayload();
+}
+
+function renderAppVersion() {
+  const el = $("appVersion");
+  if (el) el.textContent = `v${APP_VERSION} / updated ${APP_UPDATED_AT}`;
 }
 
 function allTasks() {
@@ -657,23 +665,27 @@ function renderProjectNode(project) {
   const projectOpen = state.ui.openProjects[project.id] !== false;
   const phases = groupTasksByPhase(project).filter(phase => phase.tasks.some(taskMatchesTreeFilter));
   const previewTasks = projectNextTasks(project, 5).filter(taskMatchesTreeFilter);
+  const rate = projectRate(project);
   return `
-    <article class="tree-project">
+    <article class="tree-project ${projectOpen ? "open" : ""}">
       <button class="tree-project-head" onclick="toggleProjectOpen('${project.id}')">
-        <div>
+        <div class="project-title-block">
           <p class="tree-title">${escapeHtml(project.name)}</p>
           <p class="tree-sub">${escapeHtml(project.nextAction || project.mission || "")}</p>
         </div>
+        <div class="project-progress-ring" style="--rate:${rate}%">
+          <strong>${rate}%</strong>
+          <small>進捗</small>
+        </div>
         <div class="tree-stats">
           <span class="badge">${escapeHtml(project.status || "未設定")}</span>
-          <span class="badge">${projectRate(project)}%</span>
           <span class="badge">未完了 ${openTasks.length}</span>
           <span class="badge high">高 ${high}</span>
           <span class="badge blocked">詰まり ${blocked}</span>
-          <span class="tree-toggle">${projectOpen ? "閉じる" : "開く"}</span>
+          <span class="tree-toggle">${projectOpen ? "ワークフローを閉じる" : "ワークフローを開く"}</span>
         </div>
       </button>
-      <div class="progressbar"><span style="width:${projectRate(project)}%"></span></div>
+      <div class="progressbar project-progressbar"><span style="width:${rate}%"></span></div>
       <div class="project-next">
         <div class="project-next-head">
           <span>次にやること</span>
@@ -685,7 +697,15 @@ function renderProjectNode(project) {
           </div>
         ` : `<p class="empty compact-empty">条件に合うやることなし</p>`}
       </div>
-      ${projectOpen ? `<div class="phase-list">${phases.map(phase => renderPhaseNode(project, phase)).join("") || `<p class="empty">条件に合うタスクなし</p>`}</div>` : ""}
+      ${projectOpen ? `
+        <div class="workflow">
+          <div class="workflow-head">
+            <span>ワークフロー</span>
+            <small>${phases.length}ステップ</small>
+          </div>
+          <div class="phase-list">${phases.map((phase, index) => renderPhaseNode(project, phase, index, phases)).join("") || `<p class="empty">条件に合うタスクなし</p>`}</div>
+        </div>
+      ` : ""}
     </article>
   `;
 }
@@ -739,25 +759,39 @@ function renderProjectNextTask(project, task) {
   `;
 }
 
-function renderPhaseNode(project, phase) {
+function renderPhaseNode(project, phase, index = 0, phases = []) {
   const phaseKey = `${project.id}:${phase.phaseId}`;
   const phaseOpen = state.ui.openPhases[phaseKey] !== false;
   const visibleTasks = phase.tasks.filter(taskMatchesTreeFilter);
   const done = phase.tasks.filter(t => t.status === "done").length;
   const rate = phase.tasks.length ? Math.round(done / phase.tasks.length * 100) : 0;
   const openCount = phase.tasks.length - done;
+  const firstOpenIndex = phases.findIndex(p => p.tasks.some(t => t.status !== "done"));
+  const activeIndex = firstOpenIndex === -1 ? phases.length - 1 : firstOpenIndex;
+  const hasActiveTask = phase.tasks.some(t => t.status === "doing" || t.focus || t.isBlocked);
+  const workflowState = openCount === 0 ? "complete" : (index === activeIndex || hasActiveTask ? "active" : "waiting");
   return `
-    <section class="tree-phase">
+    <section class="tree-phase workflow-step ${workflowState}">
       <button class="tree-phase-head" onclick="togglePhaseOpen('${project.id}', '${phase.phaseId}')">
-        <span>${escapeHtml(phase.phaseTitle)}</span>
-        <span class="badge">${rate}%</span>
-        <span class="badge">未完了 ${openCount}</span>
-        <span class="tree-toggle">${phaseOpen ? "閉じる" : "開く"}</span>
+        <span class="workflow-index">${index + 1}</span>
+        <span class="workflow-title">
+          <strong>${escapeHtml(phase.phaseTitle)}</strong>
+          <small>${workflowStateLabel(workflowState)}</small>
+        </span>
+        <span class="workflow-meta">
+          <span class="badge">${rate}%</span>
+          <span class="badge">未完了 ${openCount}</span>
+          <span class="tree-toggle">${phaseOpen ? "閉じる" : "開く"}</span>
+        </span>
       </button>
       <div class="progressbar phase-progress"><span style="width:${rate}%"></span></div>
       ${phaseOpen ? `<div class="tree-task-list">${visibleTasks.map(t => renderTreeTask(project, t)).join("")}</div>` : ""}
     </section>
   `;
+}
+
+function workflowStateLabel(state) {
+  return ({ complete: "完了", active: "いま進める場所", waiting: "これから" })[state] || "未設定";
 }
 
 function renderTreeTask(project, task) {
