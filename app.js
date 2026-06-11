@@ -1,7 +1,8 @@
 const STORAGE_KEY = "project-control-mini-v2";
 const DATA_VERSION = 6;
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.3.0";
 const APP_UPDATED_AT = "2026-06-11";
+const HOME_PROJECT_IDS = ["p-photo", "p-toolnav", "p-carapp", "p-affiliate"];
 
 function task(id, title, note = "", priority = "mid") {
   return { id, title, note, status: "todo", priority, due: "" };
@@ -288,6 +289,8 @@ let editingTaskId = null;
 let editingIdeaId = null;
 let editingRepoId = null;
 let ideaSaveMode = "close";
+let viewState = { view: "home", projectId: "", phaseId: "" };
+let phaseTaskFilter = "open";
 
 const $ = (id) => document.getElementById(id);
 
@@ -571,13 +574,7 @@ function render() {
   if (!currentProject() && state.projects.length) state.selectedProjectId = state.projects[0].id;
 
   renderAppVersion();
-  renderSummary();
-  renderFocusArea();
-  renderProjectTree();
-  renderIdeas();
-  renderRepositories();
-
-  $("globalMemo").value = state.memo || "";
+  renderScreen();
   updateChatGPTPayload();
 }
 
@@ -588,6 +585,265 @@ function renderAppVersion() {
 
 function allTasks() {
   return state.projects.flatMap(p => (p.tasks || []).map(t => ({...t, projectId: p.id, projectName: p.name, projectStatus: p.status, projectNextAction: p.nextAction})));
+}
+
+function renderScreen() {
+  const screen = $("screen");
+  if (!screen) return;
+
+  if (viewState.view === "project") screen.innerHTML = renderProjectDetailScreen();
+  else if (viewState.view === "phase") screen.innerHTML = renderPhaseTaskScreen();
+  else if (viewState.view === "ideas") screen.innerHTML = renderIdeasScreen();
+  else if (viewState.view === "github") screen.innerHTML = renderGithubScreen();
+  else if (viewState.view === "share") screen.innerHTML = renderShareScreen();
+  else if (viewState.view === "data") screen.innerHTML = renderDataScreen();
+  else screen.innerHTML = renderHomeScreen();
+
+  if (viewState.view === "ideas") renderIdeas();
+  if (viewState.view === "github") renderRepositories();
+  if (viewState.view === "share") updateChatGPTPayload();
+  if (viewState.view === "data" && $("globalMemo")) $("globalMemo").value = state.memo || "";
+  bindScreenEvents();
+  updateNav();
+}
+
+function homeProjects() {
+  const ordered = HOME_PROJECT_IDS.map(id => state.projects.find(p => p.id === id)).filter(Boolean);
+  const rest = state.projects.filter(p => !HOME_PROJECT_IDS.includes(p.id));
+  return [...ordered, ...rest];
+}
+
+function renderHomeScreen() {
+  return `
+    <section class="home-screen">
+      <div class="screen-head">
+        <h2>プロジェクト</h2>
+      </div>
+      <div class="project-launcher">
+        ${homeProjects().map(project => `
+          <button class="project-launch-card" onclick="openProjectDetail('${project.id}')">
+            <span>${escapeHtml(project.name)}</span>
+            ${project.status ? `<small>${escapeHtml(project.status)}</small>` : ""}
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderProjectDetailScreen() {
+  const project = state.projects.find(p => p.id === viewState.projectId) || currentProject();
+  if (!project) return `<p class="empty">プロジェクトがありません。</p>`;
+  const tasks = project.tasks || [];
+  const openTasks = tasks.filter(t => t.status !== "done");
+  const high = openTasks.filter(t => t.priority === "high").length;
+  const blocked = openTasks.filter(t => t.isBlocked).length;
+  const focus = projectNextTasks(project, 1)[0];
+  const phases = groupTasksByPhase(project);
+  return `
+    <section class="detail-screen">
+      <button class="back-btn" onclick="goHome()">← 戻る</button>
+      <div class="project-detail-head">
+        <h2>${escapeHtml(project.name)}</h2>
+        ${project.status ? `<span class="badge">${escapeHtml(project.status)}</span>` : ""}
+      </div>
+      <div class="detail-block">
+        <h3>目的</h3>
+        <p>${escapeHtml(project.mission || "未設定")}</p>
+      </div>
+      <div class="detail-block">
+        <h3>次の一手</h3>
+        <p>${escapeHtml(project.nextAction || "未設定")}</p>
+      </div>
+      ${focus ? `
+        <div class="today-chip">
+          <small>今日の集中</small>
+          <span>${escapeHtml(displayTaskTitle(focus))}</span>
+        </div>
+      ` : ""}
+      <div class="detail-metrics">
+        <div><strong>${projectRate(project)}%</strong><small>進捗</small></div>
+        <div><strong>${high}</strong><small>高優先度</small></div>
+        <div><strong>${blocked}</strong><small>詰まり中</small></div>
+      </div>
+      <div class="progressbar"><span style="width:${projectRate(project)}%"></span></div>
+      <section class="phase-launch-section">
+        <h3>フェーズ</h3>
+        <div class="phase-launch-list">
+          ${phases.map(phase => `
+            <button class="phase-launch-card" onclick="openPhaseDetail('${project.id}', '${phase.phaseId}')">
+              <span>${escapeHtml(phase.phaseTitle)}</span>
+            </button>
+          `).join("") || `<p class="empty">フェーズなし</p>`}
+        </div>
+      </section>
+    </section>
+  `;
+}
+
+function renderPhaseTaskScreen() {
+  const project = state.projects.find(p => p.id === viewState.projectId) || currentProject();
+  const phase = project ? groupTasksByPhase(project).find(p => p.phaseId === viewState.phaseId) : null;
+  if (!project || !phase) return `<section class="detail-screen"><button class="back-btn" onclick="openProjectDetail('${escapeAttr(viewState.projectId)}')">← 戻る</button><p class="empty">フェーズが見つかりません。</p></section>`;
+  const done = phase.tasks.filter(t => t.status === "done").length;
+  const rate = phase.tasks.length ? Math.round(done / phase.tasks.length * 100) : 0;
+  const visibleTasks = phase.tasks.filter(taskMatchesPhaseFilter);
+  return `
+    <section class="detail-screen">
+      <button class="back-btn" onclick="openProjectDetail('${project.id}')">← 戻る</button>
+      <p class="eyebrow">${escapeHtml(project.name)}</p>
+      <h2>${escapeHtml(phase.phaseTitle)}</h2>
+      <div class="detail-metrics compact">
+        <div><strong>${rate}%</strong><small>進捗</small></div>
+        <div><strong>${phase.tasks.length - done}</strong><small>未完了</small></div>
+        <div><strong>${done}</strong><small>完了</small></div>
+      </div>
+      <div class="progressbar"><span style="width:${rate}%"></span></div>
+      <div class="filters phase-task-filters">
+        <button class="phase-filter ${phaseTaskFilter === "open" ? "active" : ""}" onclick="setPhaseTaskFilter('open')">未完了</button>
+        <button class="phase-filter ${phaseTaskFilter === "done" ? "active" : ""}" onclick="setPhaseTaskFilter('done')">完了</button>
+        <button class="phase-filter ${phaseTaskFilter === "high" ? "active" : ""}" onclick="setPhaseTaskFilter('high')">高優先度</button>
+        <button class="phase-filter ${phaseTaskFilter === "blocked" ? "active" : ""}" onclick="setPhaseTaskFilter('blocked')">詰まり中</button>
+        <button class="phase-filter ${phaseTaskFilter === "all" ? "active" : ""}" onclick="setPhaseTaskFilter('all')">全部</button>
+      </div>
+      <div class="phase-task-list">
+        ${visibleTasks.map(task => renderPhaseTask(project, task)).join("") || `<p class="empty">条件に合うタスクなし</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function taskMatchesPhaseFilter(task) {
+  if (phaseTaskFilter === "done") return task.status === "done";
+  if (phaseTaskFilter === "high") return task.status !== "done" && task.priority === "high";
+  if (phaseTaskFilter === "blocked") return task.status !== "done" && task.isBlocked;
+  if (phaseTaskFilter === "all") return true;
+  return task.status !== "done";
+}
+
+function renderPhaseTask(project, task) {
+  return `
+    <article class="phase-task-card ${task.status === "done" ? "done" : ""} ${task.isBlocked ? "blocked-task" : ""}">
+      <label class="phase-task-main">
+        <input type="checkbox" ${task.status === "done" ? "checked" : ""} onchange="toggleTaskDone('${project.id}', '${task.id}', this.checked)" />
+        <span>${escapeHtml(displayTaskTitle(task))}</span>
+      </label>
+      <div class="badges">
+        <span class="badge ${escapeAttr(task.priority)}">${priorityLabel(task.priority)}</span>
+        <span class="badge">${statusLabel(task.status)}</span>
+        ${task.focus ? `<span class="badge focus">今日やる</span>` : ""}
+        ${task.isBlocked ? `<span class="badge blocked">詰まり中</span>` : ""}
+      </div>
+      ${task.note ? `<details class="task-note-details"><summary>メモ</summary><p>${escapeHtml(task.note)}</p></details>` : ""}
+      <div class="task-actions">
+        <button onclick="setTaskFocus('${project.id}', '${task.id}')" class="ghost">${task.focus ? "今日やる解除" : "今日やる"}</button>
+        <button onclick="toggleTaskBlocked('${project.id}', '${task.id}')" class="ghost">${task.isBlocked ? "詰まり解除" : "詰まり中"}</button>
+        <button onclick="editTask('${task.id}', '${project.id}')" class="ghost">編集</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderIdeasScreen() {
+  return `
+    <section class="detail-screen">
+      <div class="screen-head">
+        <h2>アイデア箱</h2>
+        <button id="openIdeaBtn" class="primary small">＋アイデア</button>
+      </div>
+      <div id="ideaList" class="idea-list"></div>
+    </section>
+  `;
+}
+
+function renderGithubScreen() {
+  return `
+    <section class="detail-screen">
+      <div class="screen-head">
+        <h2>GitHub</h2>
+        <div class="row gap">
+          <button id="fetchReposBtn" class="primary small">取得</button>
+          <button id="addRepoBtn" class="ghost small">追加</button>
+        </div>
+      </div>
+      <p id="repoSyncStatus" class="hint"></p>
+      <div id="repoList" class="repo-list"></div>
+    </section>
+  `;
+}
+
+function renderShareScreen() {
+  return `
+    <section class="detail-screen">
+      <div class="screen-head">
+        <h2>ChatGPT連携</h2>
+        <button id="copyForChatGPTBtn" class="primary small">コピー</button>
+      </div>
+      <p class="hint">進捗、詰まり中、アイデア、GitHubリポジトリをまとめて共有できます。</p>
+      <textarea id="chatgptPayload" readonly></textarea>
+      <div class="row gap">
+        <button id="downloadProgressBtn" class="ghost">進捗TXT保存</button>
+        <button id="selectPayloadBtn" class="ghost">選択</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderDataScreen() {
+  return `
+    <section class="detail-screen">
+      <h2>データ管理</h2>
+      <section class="panel flat-panel">
+        <h3>全体メモ</h3>
+        <textarea id="globalMemo" placeholder="迷ったこと、あとで考えること、思いついたアイデアを書いておく"></textarea>
+      </section>
+      <section class="panel flat-panel danger-zone">
+        <h3>バックアップ</h3>
+        <div class="row gap">
+          <button id="exportBtn" class="ghost">JSONバックアップ</button>
+          <label class="file-label">
+            JSONインポート
+            <input id="importFile" type="file" accept="application/json" />
+          </label>
+          <button id="resetBtn" class="danger">初期化</button>
+        </div>
+        <p class="hint">データはこの端末のブラウザ内に保存。サーバーには送信しません。</p>
+      </section>
+    </section>
+  `;
+}
+
+function bindScreenEvents() {
+  if ($("openIdeaBtn")) $("openIdeaBtn").onclick = () => openIdeaDialog();
+  if ($("fetchReposBtn")) $("fetchReposBtn").onclick = fetchGithubRepos;
+  if ($("addRepoBtn")) $("addRepoBtn").onclick = () => openRepoDialog();
+  if ($("copyForChatGPTBtn")) $("copyForChatGPTBtn").onclick = copyPayload;
+  if ($("downloadProgressBtn")) $("downloadProgressBtn").onclick = downloadProgressTxt;
+  if ($("selectPayloadBtn")) $("selectPayloadBtn").onclick = () => {
+    $("chatgptPayload").focus();
+    $("chatgptPayload").select();
+  };
+  if ($("globalMemo")) $("globalMemo").addEventListener("input", () => {
+    state.memo = $("globalMemo").value;
+    save();
+  });
+  if ($("exportBtn")) $("exportBtn").onclick = exportJsonBackup;
+  if ($("importFile")) $("importFile").onchange = importJsonBackup;
+  if ($("resetBtn")) $("resetBtn").onclick = resetAllData;
+}
+
+function updateNav() {
+  const map = {
+    navHome: ["home", "project", "phase"],
+    navIdeas: ["ideas"],
+    navGithub: ["github"],
+    navShare: ["share"],
+    navData: ["data"]
+  };
+  Object.entries(map).forEach(([id, views]) => {
+    const btn = $(id);
+    if (btn) btn.classList.toggle("active", views.includes(viewState.view));
+  });
 }
 
 function renderSummary() {
@@ -1729,16 +1985,55 @@ function escapeAttr(str = "") {
   return escapeHtml(str);
 }
 
-$("addProjectBtn").onclick = addProject;
-$("openIdeaBtn").onclick = () => openIdeaDialog();
 $("quickIdeaBtn").onclick = () => openIdeaDialog();
-$("fetchReposBtn").onclick = fetchGithubRepos;
-$("addRepoBtn").onclick = () => openRepoDialog();
-$("copyForChatGPTBtn").onclick = copyPayload;
-$("downloadProgressBtn").onclick = downloadProgressTxt;
-$("selectPayloadBtn").onclick = () => {
-  $("chatgptPayload").focus();
-  $("chatgptPayload").select();
+
+window.goHome = () => {
+  viewState = { view: "home", projectId: "", phaseId: "" };
+  render();
+};
+
+window.goIdeas = () => {
+  viewState = { view: "ideas", projectId: "", phaseId: "" };
+  render();
+};
+
+window.goGithub = () => {
+  viewState = { view: "github", projectId: "", phaseId: "" };
+  render();
+};
+
+window.goShare = () => {
+  viewState = { view: "share", projectId: "", phaseId: "" };
+  render();
+};
+
+window.goData = () => {
+  viewState = { view: "data", projectId: "", phaseId: "" };
+  render();
+};
+
+window.openProjectDetail = (projectId) => {
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  state.selectedProjectId = project.id;
+  viewState = { view: "project", projectId: project.id, phaseId: "" };
+  save();
+  render();
+};
+
+window.openPhaseDetail = (projectId, phaseId) => {
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  state.selectedProjectId = project.id;
+  viewState = { view: "phase", projectId: project.id, phaseId };
+  phaseTaskFilter = "open";
+  save();
+  render();
+};
+
+window.setPhaseTaskFilter = (filter) => {
+  phaseTaskFilter = filter;
+  render();
 };
 
 $("saveIdeaBtn").onclick = () => {
@@ -1799,22 +2094,7 @@ $("repoForm").addEventListener("submit", (e) => {
   saveRepoFromForm();
 });
 
-document.querySelectorAll(".tree-filter").forEach(btn => {
-  btn.onclick = () => {
-    state.treeFilter = btn.dataset.treeFilter;
-    document.querySelectorAll(".tree-filter").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    save();
-    renderProjectTree();
-  };
-});
-
-$("globalMemo").addEventListener("input", () => {
-  state.memo = $("globalMemo").value;
-  save();
-});
-
-$("exportBtn").onclick = () => {
+function exportJsonBackup() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1822,9 +2102,9 @@ $("exportBtn").onclick = () => {
   a.download = `project-control-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
-};
+}
 
-$("importFile").onchange = async (e) => {
+async function importJsonBackup(e) {
   const file = e.target.files?.[0];
   if (!file) return;
   try {
@@ -1838,14 +2118,15 @@ $("importFile").onchange = async (e) => {
   } catch {
     alert("読み込めないJSONです");
   }
-};
+}
 
-$("resetBtn").onclick = () => {
+function resetAllData() {
   if (!confirm("初期データに戻す？今のデータは消えます。先にバックアップ推奨。")) return;
   state = normalizeState(structuredClone(defaultState));
+  viewState = { view: "home", projectId: "", phaseId: "" };
   save();
   render();
-};
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

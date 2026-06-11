@@ -1,4 +1,4 @@
-const CACHE = "project-control-mini-v2.2.1";
+const CACHE = "project-control-mini-v2.3.0";
 const ASSETS = [
   "./",
   "./index.html",

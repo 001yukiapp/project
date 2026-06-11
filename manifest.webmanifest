@@ -1,6 +1,6 @@
 {
-  "name": "Project Control Mini v2",
-  "short_name": "ProjectMini",
+  "name": "ProjectControl",
+  "short_name": "ProjectControl",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1020",

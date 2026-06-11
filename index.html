@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
-  <title>Project Control Mini v2</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=2.2.1" />
-  <link rel="stylesheet" href="./styles.css?v=2.2.1" />
+  <title>ProjectControl</title>
+  <link rel="manifest" href="./manifest.webmanifest?v=2.3.0" />
+  <link rel="stylesheet" href="./styles.css?v=2.3.0" />
 </head>
 <body>
   <div class="app">
@@ -16,96 +16,9 @@
         <h1>ProjectControl</h1>
         <p id="appVersion" class="version-label">Version</p>
       </div>
-      <button id="exportBtn" class="ghost">JSONバックアップ</button>
     </header>
 
-    <section class="summary">
-      <div class="summary-card">
-        <span id="projectCount">0</span>
-        <small>プロジェクト</small>
-      </div>
-      <div class="summary-card">
-        <span id="activeTaskCount">0</span>
-        <small>未完了タスク</small>
-      </div>
-      <div class="summary-card">
-        <span id="doneRate">0%</span>
-        <small>全体進捗</small>
-      </div>
-    </section>
-
-    <main>
-      <section id="focusArea" class="focus-area"></section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Projects</h2>
-          <div class="row gap">
-            <button id="addProjectBtn" class="primary small">プロジェクト追加</button>
-          </div>
-        </div>
-        <div class="filters tree-filters">
-          <button class="tree-filter active" data-tree-filter="all">全部</button>
-          <button class="tree-filter" data-tree-filter="open">未完了</button>
-          <button class="tree-filter" data-tree-filter="high">高優先度</button>
-          <button class="tree-filter" data-tree-filter="focus">今日やる</button>
-          <button class="tree-filter" data-tree-filter="blocked">詰まり中</button>
-        </div>
-        <div id="projectTree" class="project-tree"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>アイデア箱</h2>
-          <button id="openIdeaBtn" class="primary small">＋アイデア</button>
-        </div>
-        <div id="ideaList" class="idea-list"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>GitHubリポジトリ箱</h2>
-          <div class="row gap">
-            <button id="fetchReposBtn" class="primary small">GitHubから取得</button>
-            <button id="addRepoBtn" class="ghost small">リポジトリ追加</button>
-          </div>
-        </div>
-        <p id="repoSyncStatus" class="hint"></p>
-        <div id="repoList" class="repo-list"></div>
-      </section>
-
-      <section class="panel sticky-panel">
-        <div class="panel-head">
-          <h2>ChatGPT連携</h2>
-          <button id="copyForChatGPTBtn" class="primary small">コピー</button>
-        </div>
-        <p class="hint">
-          今日の集中、詰まり中、プロジェクトツリー、アイデア箱、GitHubリポジトリ箱をまとめて共有できます。
-        </p>
-        <textarea id="chatgptPayload" readonly></textarea>
-        <div class="row gap">
-          <button id="downloadProgressBtn" class="ghost">進捗TXT保存</button>
-          <button id="selectPayloadBtn" class="ghost">選択</button>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2>全体メモ</h2>
-        <textarea id="globalMemo" placeholder="迷ったこと、あとで考えること、思いついたアイデアを書いておく"></textarea>
-      </section>
-
-      <section class="panel danger-zone">
-        <h2>データ</h2>
-        <div class="row gap">
-          <label class="file-label">
-            JSONインポート
-            <input id="importFile" type="file" accept="application/json" />
-          </label>
-          <button id="resetBtn" class="danger">初期化</button>
-        </div>
-        <p class="hint">データはこの端末のブラウザ内に保存。サーバーには送信しません。</p>
-      </section>
-    </main>
+    <main id="screen" class="screen"></main>
   </div>
 
   <dialog id="taskDialog">
@@ -236,8 +149,15 @@
   </dialog>
 
   <button id="quickIdeaBtn" class="quick-idea-btn">＋アイデア</button>
+  <nav class="bottom-nav" aria-label="メインナビゲーション">
+    <button id="navHome" onclick="goHome()">ホーム</button>
+    <button id="navIdeas" onclick="goIdeas()">アイデア</button>
+    <button id="navGithub" onclick="goGithub()">GitHub</button>
+    <button id="navShare" onclick="goShare()">共有</button>
+    <button id="navData" onclick="goData()">データ</button>
+  </nav>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="./app.js?v=2.2.1"></script>
+  <script src="./app.js?v=2.3.0"></script>
 </body>
 </html>
