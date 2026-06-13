@@ -44,7 +44,7 @@
   </head>
   <body>
     <main>
-      <h1>更新中 v008</h1>
+      <h1>更新中 v010</h1>
       <p id="status">古いService Workerとキャッシュを削除しています。</p>
       <button id="retry" type="button" hidden>もう一度実行</button>
     </main>
@@ -78,7 +78,7 @@
         try {
           await clearTiltAudioCache();
           status.textContent = "削除完了。最新版を読み込みます。";
-          window.location.replace("./index.html?force=v008-" + Date.now());
+          window.location.replace("./index.html?force=v010-" + Date.now());
         } catch (error) {
           status.textContent = "自動更新に失敗しました。もう一度実行してください。";
           retry.hidden = false;
@@ -90,6 +90,8 @@
     </script>
   </body>
 </html>
+
+
 
 
 

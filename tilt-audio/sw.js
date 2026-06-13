@@ -1,11 +1,12 @@
 "use strict";
 
-const CACHE_NAME = "tilt-audio-pwa-v8";
+const CACHE_NAME = "tilt-audio-pwa-v10";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./sw.js",
+  "./version.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"
@@ -56,6 +57,8 @@ self.addEventListener("fetch", (event) => {
     }).catch(() => caches.match(event.request))
   );
 });
+
+
 
 
 

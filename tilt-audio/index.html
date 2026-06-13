@@ -338,7 +338,7 @@
     <main class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Tilt Audio PWA v008</p>
+          <p class="eyebrow">Tilt Audio PWA v010</p>
           <h1>傾き音声ガイド</h1>
         </div>
         <div id="runBadge" class="run-badge">停止中</div>
@@ -438,7 +438,7 @@
       "use strict";
 
       const CONFIG = {
-        APP_VERSION: "v008",
+        APP_VERSION: "v010",
         LOW_SIDE_HZ: 450,
         HIGH_SIDE_HZ: 1050,
         TARGET_HZ: 750,
@@ -455,10 +455,10 @@
         TARGET_EXIT_EXTRA_DEG: 0.18,
         SMOOTHING_ALPHA: 0.34,
         SILENT_UNLOCK_MS: 35,
-        MASTER_GAIN: 0.75,
-        BEEP_GAIN: 0.28,
-        TARGET_GAIN: 0.16,
-        WARNING_GAIN: 0.28
+        MASTER_GAIN: 1.0,
+        BEEP_GAIN: 0.65,
+        TARGET_GAIN: 0.35,
+        WARNING_GAIN: 0.65
       };
 
       const els = {
@@ -713,7 +713,7 @@
         return CONFIG.NEAR_INTERVAL_MS + (CONFIG.FAR_INTERVAL_MS - CONFIG.NEAR_INTERVAL_MS) * eased;
       }
 
-      async function ensureAudioContext() {
+      function ensureAudioContext() {
         if (!app.audio.ctx) {
           const AudioCtor = window.AudioContext || window.webkitAudioContext;
           if (!AudioCtor) throw new Error("Web Audio APIが使えません");
@@ -722,7 +722,8 @@
           app.audio.master.gain.value = CONFIG.MASTER_GAIN;
           app.audio.master.connect(app.audio.ctx.destination);
         }
-        await app.audio.ctx.resume();
+        if (app.audio.ctx.state !== "running") app.audio.ctx.resume().catch(() => {});
+        return app.audio.ctx;
       }
 
       function stopOscillators() {
@@ -878,22 +879,27 @@
         }
       }
 
-      async function unlockAudio() {
-        await ensureAudioContext();
-        playTone(CONFIG.TARGET_HZ, CONFIG.SILENT_UNLOCK_MS, "sine", 0.02);
+      function unlockAudio() {
+        ensureAudioContext();
+        playTone(CONFIG.TARGET_HZ, 80, "square", CONFIG.BEEP_GAIN);
       }
 
-      async function runAudioTest() {
+      function runAudioTest() {
         try {
-          await ensureAudioContext();
+          ensureAudioContext();
           clearAudioLoop();
           setSensorStatus("音テスト中");
-          logEvent("audio-test");
-          playTone(CONFIG.LOW_SIDE_HZ, 160, "sine", CONFIG.BEEP_GAIN);
-          window.setTimeout(() => playTone(CONFIG.HIGH_SIDE_HZ, 160, "sine", CONFIG.BEEP_GAIN), 260);
-          window.setTimeout(() => playTone(CONFIG.TARGET_HZ, 420, "triangle", CONFIG.TARGET_GAIN), 540);
+          logEvent("audio-test", {
+            currentTime: app.audio.ctx ? Number(app.audio.ctx.currentTime.toFixed(3)) : null,
+            sampleRate: app.audio.ctx ? app.audio.ctx.sampleRate : null,
+            outputLatency: app.audio.ctx && "outputLatency" in app.audio.ctx ? app.audio.ctx.outputLatency : null
+          });
+          playTone(CONFIG.LOW_SIDE_HZ, 320, "square", CONFIG.BEEP_GAIN);
+          window.setTimeout(() => playTone(CONFIG.HIGH_SIDE_HZ, 320, "square", CONFIG.BEEP_GAIN), 420);
+          window.setTimeout(() => playTone(CONFIG.TARGET_HZ, 700, "sawtooth", CONFIG.TARGET_GAIN), 900);
         } catch (error) {
           setSensorStatus(error && error.message ? error.message : "音テスト失敗");
+          logEvent("audio-test-error", { message: error && error.message ? error.message : String(error) });
         }
       }
 
@@ -995,14 +1001,16 @@
         if (!("serviceWorker" in navigator)) return;
 
         let refreshing = false;
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
+        const requestReload = () => {
           if (refreshing) return;
           refreshing = true;
-          window.location.reload();
-        });
+          window.location.replace(`./index.html?app=${CONFIG.APP_VERSION}&t=${Date.now()}`);
+        };
+
+        navigator.serviceWorker.addEventListener("controllerchange", requestReload);
 
         navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((registration) => {
-          const applyWaitingWorker = () => {
+          const activateWaiting = () => {
             if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
           };
 
@@ -1010,14 +1018,28 @@
             const worker = registration.installing;
             if (!worker) return;
             worker.addEventListener("statechange", () => {
-              if (worker.state === "installed" && navigator.serviceWorker.controller) {
-                worker.postMessage({ type: "SKIP_WAITING" });
-              }
+              if (worker.state === "installed") worker.postMessage({ type: "SKIP_WAITING" });
             });
           });
 
-          applyWaitingWorker();
-          registration.update().catch(() => {});
+          const checkForUpdate = () => {
+            registration.update().then(activateWaiting).catch(() => {});
+            fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" })
+              .then((response) => response.ok ? response.json() : null)
+              .then((data) => {
+                if (data && data.version && data.version !== CONFIG.APP_VERSION) requestReload();
+              })
+              .catch(() => {});
+          };
+
+          activateWaiting();
+          checkForUpdate();
+          window.addEventListener("focus", checkForUpdate);
+          window.addEventListener("online", checkForUpdate);
+          document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) checkForUpdate();
+          });
+          window.setInterval(checkForUpdate, 30000);
         }).catch(() => {
           setSensorStatus("Service Worker登録に失敗しました");
         });
@@ -1074,6 +1096,8 @@
     </script>
   </body>
 </html>
+
+
 
 
 
