@@ -4,7 +4,7 @@ iPhone実機で、画面を見ずに目標角へ近づける音UIを検証する
 
 ## GitHub Pages URL
 
-https://001yukiapp.github.io/project/test-pwa/tilt-audio/
+https://001yukiapp.github.io/project/tilt-audio/
 
 CSSとJavaScriptは `index.html` 内に収め、manifest、Service Worker、アイコンは相対パスで参照しています。
 
@@ -19,7 +19,7 @@ cd C:\Users\doiyu\project
 python -m http.server 8080
 ```
 
-その場合は `http://localhost:8080/test-pwa/tilt-audio/` を開きます。
+その場合は `http://localhost:8080/tilt-audio/` を開きます。
 
 ## 操作
 

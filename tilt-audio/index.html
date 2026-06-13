@@ -795,14 +795,17 @@
       async function start() {
         try {
           app.axis = selectedAxis();
-          await unlockAudio();
           clearAudioLoop();
           app.running = true;
           app.signalLost = false;
           app.lastValueAt = performance.now();
 
+          const permissionPromise = app.simulation ? Promise.resolve() : requestOrientationPermission();
+          const audioPromise = unlockAudio();
+          await permissionPromise;
+          await audioPromise;
+
           if (!app.simulation) {
-            await requestOrientationPermission();
             attachOrientation();
             setSensorStatus("センサー待機中");
             if (app.filteredAngle == null) markSignalLost("センサー値待機中");
