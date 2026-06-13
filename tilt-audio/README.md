@@ -2,6 +2,10 @@
 
 iPhone実機で、画面を見ずに目標角へ近づける音UIを検証するための静的PWAです。既存アプリへ組み込む前の単独検証用です。
 
+## 表示バージョン
+
+v003
+
 ## GitHub Pages URL
 
 https://001yukiapp.github.io/project/tilt-audio/
@@ -45,3 +49,4 @@ python -m http.server 8080
 ## 制約
 
 実機のモーションセンサーはHTTPSまたはホーム画面追加版で確認してください。PCブラウザではシミュレーションモードで音判定のみ確認できます。
+
