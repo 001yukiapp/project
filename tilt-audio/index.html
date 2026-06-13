@@ -319,7 +319,7 @@
     <main class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Tilt Audio PWA v003</p>
+          <p class="eyebrow">Tilt Audio PWA v004</p>
           <h1>傾き音声ガイド</h1>
         </div>
         <div id="runBadge" class="run-badge">停止中</div>
@@ -408,7 +408,7 @@
       "use strict";
 
       const CONFIG = {
-        APP_VERSION: "v003",
+        APP_VERSION: "v004",
         LOW_SIDE_HZ: 450,
         HIGH_SIDE_HZ: 1050,
         TARGET_HZ: 750,
@@ -884,11 +884,35 @@
       }
 
       function registerServiceWorker() {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.register("./sw.js").catch(() => {
-            setSensorStatus("Service Worker登録に失敗しました");
+        if (!("serviceWorker" in navigator)) return;
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+
+        navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((registration) => {
+          const applyWaitingWorker = () => {
+            if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          };
+
+          registration.addEventListener("updatefound", () => {
+            const worker = registration.installing;
+            if (!worker) return;
+            worker.addEventListener("statechange", () => {
+              if (worker.state === "installed" && navigator.serviceWorker.controller) {
+                worker.postMessage({ type: "SKIP_WAITING" });
+              }
+            });
           });
-        }
+
+          applyWaitingWorker();
+          registration.update().catch(() => {});
+        }).catch(() => {
+          setSensorStatus("Service Worker登録に失敗しました");
+        });
       }
 
       document.querySelectorAll("input[name='axis']").forEach((input) => {
@@ -939,4 +963,5 @@
     </script>
   </body>
 </html>
+
 
