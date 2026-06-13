@@ -4,11 +4,13 @@ iPhone実機で、画面を見ずに目標角へ近づける音UIを検証する
 
 ## 表示バージョン
 
-v004
+v005
 
 ## GitHub Pages URL
 
 https://001yukiapp.github.io/project/tilt-audio/
+
+強制更新URL: https://001yukiapp.github.io/project/tilt-audio/force-update.html
 
 CSSとJavaScriptは `index.html` 内に収め、manifest、Service Worker、アイコンは相対パスで参照しています。
 
@@ -49,5 +51,6 @@ python -m http.server 8080
 ## 制約
 
 実機のモーションセンサーはHTTPSまたはホーム画面追加版で確認してください。PCブラウザではシミュレーションモードで音判定のみ確認できます。
+
 
 
