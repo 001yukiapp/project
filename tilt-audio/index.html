@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#10261f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tilt Audio">
+    <title>Tilt Audio Guide</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <link rel="icon" href="./icons/icon-192.png">
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f4f1ea;
+        color: #14211d;
+        --panel: #fffdf8;
+        --ink-soft: #50615b;
+        --line: #d9d2c2;
+        --accent: #0f6b55;
+        --accent-dark: #0b4e40;
+        --danger: #a63d2f;
+        --minus: #315d9b;
+        --plus: #9b3f2f;
+        --target: #0f6b55;
+        --warn: #8b5b00;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100svh;
+        background:
+          linear-gradient(180deg, rgba(15, 107, 85, 0.14), rgba(244, 241, 234, 0) 260px),
+          #f4f1ea;
+      }
+
+      button, input { font: inherit; }
+
+      .app-shell {
+        width: min(720px, 100%);
+        margin: 0 auto;
+        padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--ink-soft);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1, h2 {
+        margin: 0;
+        line-height: 1.15;
+      }
+
+      h1 { font-size: clamp(1.6rem, 9vw, 2.5rem); }
+      h2 { font-size: 1rem; }
+
+      .run-badge,
+      .state-text {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink-soft);
+        font-weight: 700;
+      }
+
+      .run-badge {
+        flex: 0 0 auto;
+        min-width: 76px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      section { margin-top: 12px; }
+
+      .readout,
+      .controls,
+      .simulation,
+      .debug {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 253, 248, 0.92);
+        padding: 14px;
+      }
+
+      .angle-value {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        min-height: 112px;
+        color: #10261f;
+      }
+
+      .angle-value span {
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(4.2rem, 24vw, 7.2rem);
+        font-weight: 780;
+        line-height: 0.95;
+      }
+
+      .angle-value small {
+        margin-left: 8px;
+        color: var(--ink-soft);
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .state-text {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .state-minus .state-text, .state-minus .run-badge {
+        border-color: rgba(49, 93, 155, 0.35);
+        color: var(--minus);
+      }
+
+      .state-plus .state-text, .state-plus .run-badge {
+        border-color: rgba(155, 63, 47, 0.35);
+        color: var(--plus);
+      }
+
+      .state-target .state-text, .state-target .run-badge {
+        border-color: rgba(15, 107, 85, 0.35);
+        color: var(--target);
+      }
+
+      .state-lost .state-text, .state-lost .run-badge {
+        border-color: rgba(139, 91, 0, 0.4);
+        color: var(--warn);
+      }
+
+      .metric-grid,
+      .number-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric-grid { margin-top: 12px; }
+
+      .metric-grid div,
+      .debug dl div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbf8ef;
+        padding: 10px;
+      }
+
+      .metric-grid span,
+      .debug dt,
+      .slider-label,
+      .number-row label {
+        color: var(--ink-soft);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .metric-grid strong,
+      .debug dd {
+        display: block;
+        margin-top: 4px;
+        color: #14211d;
+        font-size: 1.2rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 0 0 12px;
+        padding: 0;
+        border: 0;
+      }
+
+      .segmented legend {
+        grid-column: 1 / -1;
+        margin-bottom: 2px;
+        color: var(--ink-soft);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .segmented label { min-height: 48px; }
+      .segmented input { position: absolute; opacity: 0; }
+
+      .segmented span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbf8ef;
+        font-weight: 800;
+      }
+
+      .segmented input:checked + span {
+        border-color: var(--accent);
+        background: #e1f0ea;
+        color: var(--accent-dark);
+      }
+
+      .number-row input {
+        width: 100%;
+        height: 48px;
+        margin-top: 6px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 10px;
+        background: #fff;
+        color: #14211d;
+        font-size: 1.1rem;
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .button-row.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      button {
+        min-height: 48px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: #14211d;
+        font-weight: 800;
+      }
+
+      button:disabled { opacity: 0.5; }
+
+      button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button.danger {
+        border-color: rgba(166, 61, 47, 0.5);
+        color: var(--danger);
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .switch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink-soft);
+        font-weight: 800;
+      }
+
+      .switch input {
+        width: 24px;
+        height: 24px;
+        accent-color: var(--accent);
+      }
+
+      .slider-label {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+      }
+
+      .slider-label input {
+        grid-column: 1 / -1;
+        width: 100%;
+        accent-color: var(--accent);
+      }
+
+      .debug dl {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 12px 0 0;
+      }
+
+      .debug dt, .debug dd { margin: 0; }
+      .debug dd { font-size: 1rem; }
+
+      @media (min-width: 560px) {
+        .button-row { grid-template-columns: 1.35fr 1fr 0.7fr; }
+        .button-row.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    </style>
+  </head>
+  <body class="state-stopped">
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Tilt Audio PWA</p>
+          <h1>傾き音声ガイド</h1>
+        </div>
+        <div id="runBadge" class="run-badge">停止中</div>
+      </header>
+
+      <section class="readout" aria-live="polite">
+        <div class="angle-value">
+          <span id="relativeAngle">--</span><small>deg</small>
+        </div>
+        <div id="stateText" class="state-text">停止中</div>
+        <div class="metric-grid">
+          <div>
+            <span>目標角</span>
+            <strong id="targetReadout">2.00 deg</strong>
+          </div>
+          <div>
+            <span>誤差</span>
+            <strong id="errorReadout">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="操作">
+        <fieldset class="segmented">
+          <legend>軸</legend>
+          <label>
+            <input type="radio" name="axis" value="gamma" checked>
+            <span>左右 gamma</span>
+          </label>
+          <label>
+            <input type="radio" name="axis" value="beta">
+            <span>前後 beta</span>
+          </label>
+        </fieldset>
+
+        <div class="number-row">
+          <label>
+            目標角
+            <input id="targetInput" type="number" inputmode="decimal" value="2.0" step="0.1">
+          </label>
+          <label>
+            許容差
+            <input id="toleranceInput" type="number" inputmode="decimal" value="0.5" min="0.1" step="0.1">
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="startButton" type="button" class="primary">センサーと音を開始</button>
+          <button id="zeroButton" type="button">現在角を0°に設定</button>
+          <button id="stopButton" type="button" class="danger">停止</button>
+        </div>
+      </section>
+
+      <section class="simulation" aria-label="シミュレーション">
+        <div class="section-heading">
+          <h2>シミュレーション</h2>
+          <label class="switch">
+            <input id="simulationToggle" type="checkbox">
+            <span>ON</span>
+          </label>
+        </div>
+        <label class="slider-label">
+          角度
+          <input id="simulationSlider" type="range" min="-8" max="8" value="0" step="0.1" disabled>
+          <strong id="simulationValue">0.0 deg</strong>
+        </label>
+        <div class="button-row compact">
+          <button id="passButton" type="button" disabled>通過</button>
+          <button id="lossButton" type="button" disabled>信号喪失</button>
+        </div>
+      </section>
+
+      <section class="debug" aria-label="デバッグ">
+        <h2>デバッグ</h2>
+        <dl>
+          <div><dt>平滑化前</dt><dd id="rawAngle">--</dd></div>
+          <div><dt>平滑化後</dt><dd id="filteredAngle">--</dd></div>
+          <div><dt>相対角</dt><dd id="debugRelative">--</dd></div>
+          <div><dt>誤差</dt><dd id="debugError">--</dd></div>
+          <div><dt>センサー</dt><dd id="sensorStatus">停止中</dd></div>
+        </dl>
+      </section>
+    </main>
+
+    <script>
+      "use strict";
+
+      const CONFIG = {
+        LOW_SIDE_HZ: 450,
+        HIGH_SIDE_HZ: 1050,
+        TARGET_HZ: 750,
+        WARNING_HZ: 180,
+        WARNING_SECOND_HZ: 1320,
+        BEEP_DURATION_MS: 70,
+        FAR_INTERVAL_MS: 700,
+        NEAR_INTERVAL_MS: 100,
+        FAR_ERROR_DEG: 3.0,
+        DEFAULT_TARGET_DEG: 2.0,
+        DEFAULT_TOLERANCE_DEG: 0.5,
+        TARGET_ENTER_HOLD_MS: 300,
+        SENSOR_TIMEOUT_MS: 600,
+        TARGET_EXIT_EXTRA_DEG: 0.18,
+        SMOOTHING_ALPHA: 0.34,
+        SILENT_UNLOCK_MS: 35
+      };
+
+      const els = {
+        body: document.body,
+        runBadge: document.getElementById("runBadge"),
+        relativeAngle: document.getElementById("relativeAngle"),
+        stateText: document.getElementById("stateText"),
+        targetReadout: document.getElementById("targetReadout"),
+        errorReadout: document.getElementById("errorReadout"),
+        targetInput: document.getElementById("targetInput"),
+        toleranceInput: document.getElementById("toleranceInput"),
+        startButton: document.getElementById("startButton"),
+        zeroButton: document.getElementById("zeroButton"),
+        stopButton: document.getElementById("stopButton"),
+        simulationToggle: document.getElementById("simulationToggle"),
+        simulationSlider: document.getElementById("simulationSlider"),
+        simulationValue: document.getElementById("simulationValue"),
+        passButton: document.getElementById("passButton"),
+        lossButton: document.getElementById("lossButton"),
+        rawAngle: document.getElementById("rawAngle"),
+        filteredAngle: document.getElementById("filteredAngle"),
+        debugRelative: document.getElementById("debugRelative"),
+        debugError: document.getElementById("debugError"),
+        sensorStatus: document.getElementById("sensorStatus")
+      };
+
+      const app = {
+        running: false,
+        simulation: false,
+        signalLost: false,
+        axis: "gamma",
+        rawAngle: null,
+        filteredAngle: null,
+        zeroAngle: 0,
+        relativeAngle: null,
+        error: null,
+        lastValueAt: 0,
+        state: "stopped",
+        targetEnteredAt: null,
+        inTargetTone: false,
+        orientationHandler: null,
+        monitorTimer: null,
+        passTimer: null,
+        audio: {
+          ctx: null,
+          master: null,
+          timeout: null,
+          oscillators: new Set(),
+          loopToken: 0
+        }
+      };
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function normalizeDeg(deg) {
+        const value = ((deg + 180) % 360 + 360) % 360 - 180;
+        return value === -180 ? 180 : value;
+      }
+
+      function fmt(value, digits = 2) {
+        return Number.isFinite(value) ? value.toFixed(digits) : "--";
+      }
+
+      function targetDeg() {
+        return Number.parseFloat(els.targetInput.value) || 0;
+      }
+
+      function toleranceDeg() {
+        return Math.max(0.1, Number.parseFloat(els.toleranceInput.value) || CONFIG.DEFAULT_TOLERANCE_DEG);
+      }
+
+      function selectedAxis() {
+        const input = document.querySelector("input[name='axis']:checked");
+        return input ? input.value : "gamma";
+      }
+
+      function setSensorStatus(text) {
+        els.sensorStatus.textContent = text;
+      }
+
+      function resetFiltering(raw = null) {
+        app.rawAngle = raw;
+        app.filteredAngle = raw;
+        app.relativeAngle = raw == null ? null : normalizeDeg(raw - app.zeroAngle);
+        app.error = app.relativeAngle == null ? null : app.relativeAngle - targetDeg();
+        app.targetEnteredAt = null;
+        app.inTargetTone = false;
+      }
+
+      function setZero() {
+        if (app.filteredAngle == null) {
+          setSensorStatus("0°設定には角度値が必要です");
+          return;
+        }
+        app.zeroAngle = app.filteredAngle;
+        app.targetEnteredAt = null;
+        app.inTargetTone = false;
+        updateDerived(performance.now());
+        render();
+      }
+
+      function ingestAngle(rawAngle, now = performance.now()) {
+        if (!Number.isFinite(rawAngle)) return;
+        app.signalLost = false;
+        app.lastValueAt = now;
+        app.rawAngle = rawAngle;
+
+        if (app.filteredAngle == null) {
+          app.filteredAngle = rawAngle;
+        } else {
+          const delta = normalizeDeg(rawAngle - app.filteredAngle);
+          app.filteredAngle = normalizeDeg(app.filteredAngle + delta * CONFIG.SMOOTHING_ALPHA);
+        }
+
+        updateDerived(now);
+        render();
+      }
+
+      function updateDerived(now = performance.now()) {
+        if (app.filteredAngle == null) {
+          app.relativeAngle = null;
+          app.error = null;
+        } else {
+          app.relativeAngle = normalizeDeg(app.filteredAngle - app.zeroAngle);
+          app.error = app.relativeAngle - targetDeg();
+        }
+        processGuidance(now);
+      }
+
+      function processGuidance(now = performance.now()) {
+        if (!app.running) {
+          app.state = "stopped";
+          return;
+        }
+
+        if (app.signalLost || app.relativeAngle == null || app.error == null) {
+          app.state = "lost";
+          app.targetEnteredAt = null;
+          app.inTargetTone = false;
+          return;
+        }
+
+        const absError = Math.abs(app.error);
+        const enter = toleranceDeg();
+        const exit = enter + Math.max(CONFIG.TARGET_EXIT_EXTRA_DEG, enter * 0.35);
+
+        if (app.inTargetTone) {
+          if (absError > exit) {
+            app.inTargetTone = false;
+            app.targetEnteredAt = null;
+          }
+        } else if (absError <= enter) {
+          if (app.targetEnteredAt == null) app.targetEnteredAt = now;
+          if (now - app.targetEnteredAt >= CONFIG.TARGET_ENTER_HOLD_MS) {
+            app.inTargetTone = true;
+          }
+        } else {
+          app.targetEnteredAt = null;
+        }
+
+        if (app.inTargetTone) {
+          app.state = "target";
+        } else {
+          app.state = app.error < 0 ? "minus" : "plus";
+        }
+      }
+
+      function stateLabel() {
+        if (app.state === "minus") return "マイナス側";
+        if (app.state === "plus") return "プラス側";
+        if (app.state === "target") return "目標内";
+        if (app.state === "lost") return "信号なし";
+        return "停止中";
+      }
+
+      function render() {
+        els.body.classList.remove("state-minus", "state-plus", "state-target", "state-lost", "state-stopped");
+        els.body.classList.add(`state-${app.state}`);
+        els.runBadge.textContent = stateLabel();
+        els.stateText.textContent = stateLabel();
+        els.relativeAngle.textContent = fmt(app.relativeAngle, 1);
+        els.targetReadout.textContent = `${fmt(targetDeg())} deg`;
+        els.errorReadout.textContent = app.error == null ? "--" : `${fmt(app.error)} deg`;
+        els.rawAngle.textContent = app.rawAngle == null ? "--" : `${fmt(app.rawAngle)} deg`;
+        els.filteredAngle.textContent = app.filteredAngle == null ? "--" : `${fmt(app.filteredAngle)} deg`;
+        els.debugRelative.textContent = app.relativeAngle == null ? "--" : `${fmt(app.relativeAngle)} deg`;
+        els.debugError.textContent = app.error == null ? "--" : `${fmt(app.error)} deg`;
+        els.simulationValue.textContent = `${Number.parseFloat(els.simulationSlider.value).toFixed(1)} deg`;
+      }
+
+      function beepIntervalMs(absError) {
+        const t = clamp(absError / CONFIG.FAR_ERROR_DEG, 0, 1);
+        const eased = Math.sqrt(t);
+        return CONFIG.NEAR_INTERVAL_MS + (CONFIG.FAR_INTERVAL_MS - CONFIG.NEAR_INTERVAL_MS) * eased;
+      }
+
+      async function ensureAudioContext() {
+        if (!app.audio.ctx) {
+          const AudioCtor = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtor) throw new Error("Web Audio APIが使えません");
+          app.audio.ctx = new AudioCtor();
+          app.audio.master = app.audio.ctx.createGain();
+          app.audio.master.gain.value = 0.16;
+          app.audio.master.connect(app.audio.ctx.destination);
+        }
+        await app.audio.ctx.resume();
+      }
+
+      function stopOscillators() {
+        for (const osc of app.audio.oscillators) {
+          try { osc.stop(); } catch (_) {}
+        }
+        app.audio.oscillators.clear();
+      }
+
+      function clearAudioLoop() {
+        app.audio.loopToken += 1;
+        if (app.audio.timeout) {
+          clearTimeout(app.audio.timeout);
+          app.audio.timeout = null;
+        }
+        stopOscillators();
+      }
+
+      function playTone(freq, durationMs, type = "sine", gainValue = 0.16) {
+        if (!app.audio.ctx || !app.audio.master) return;
+        const ctx = app.audio.ctx;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
+        osc.connect(gain);
+        gain.connect(app.audio.master);
+        osc.start(now);
+        osc.stop(now + durationMs / 1000 + 0.025);
+        app.audio.oscillators.add(osc);
+        osc.onended = () => app.audio.oscillators.delete(osc);
+      }
+
+      function startTargetTone() {
+        stopOscillators();
+        if (!app.audio.ctx || !app.audio.master) return;
+        const ctx = app.audio.ctx;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(CONFIG.TARGET_HZ, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.08);
+        osc.connect(gain);
+        gain.connect(app.audio.master);
+        osc.start(now);
+        app.audio.oscillators.add(osc);
+      }
+
+      function scheduleAudioLoop(delay = 0) {
+        const token = app.audio.loopToken;
+        if (app.audio.timeout) clearTimeout(app.audio.timeout);
+        app.audio.timeout = setTimeout(() => {
+          if (!app.running || token !== app.audio.loopToken) return;
+          runAudioStep(token);
+        }, delay);
+      }
+
+      function runAudioStep(token) {
+        if (!app.running || token !== app.audio.loopToken) return;
+
+        if (app.state === "target") {
+          if (app.audio.oscillators.size === 0) startTargetTone();
+          scheduleAudioLoop(80);
+          return;
+        }
+
+        stopOscillators();
+
+        if (app.state === "lost") {
+          playTone(CONFIG.WARNING_HZ, 90, "square", 0.12);
+          window.setTimeout(() => playTone(CONFIG.WARNING_SECOND_HZ, 70, "square", 0.1), 115);
+          scheduleAudioLoop(900);
+          return;
+        }
+
+        if (app.state === "minus" || app.state === "plus") {
+          const hz = app.state === "minus" ? CONFIG.LOW_SIDE_HZ : CONFIG.HIGH_SIDE_HZ;
+          playTone(hz, CONFIG.BEEP_DURATION_MS, "sine", 0.16);
+          scheduleAudioLoop(beepIntervalMs(Math.abs(app.error || 0)));
+          return;
+        }
+
+        scheduleAudioLoop(120);
+      }
+
+      function startAudioLoop() {
+        clearAudioLoop();
+        app.audio.loopToken += 1;
+        scheduleAudioLoop(0);
+      }
+
+      function markSignalLost(text = "信号なし") {
+        if (!app.running) return;
+        app.signalLost = true;
+        app.state = "lost";
+        setSensorStatus(text);
+        render();
+      }
+
+      function startMonitor() {
+        if (app.monitorTimer) clearInterval(app.monitorTimer);
+        app.monitorTimer = setInterval(() => {
+          if (!app.running || app.simulation) return;
+          if (performance.now() - app.lastValueAt > CONFIG.SENSOR_TIMEOUT_MS) {
+            markSignalLost("センサー値が途絶えました");
+          }
+        }, 120);
+      }
+
+      function stopMonitor() {
+        if (app.monitorTimer) {
+          clearInterval(app.monitorTimer);
+          app.monitorTimer = null;
+        }
+      }
+
+      async function requestOrientationPermission() {
+        if (!("DeviceOrientationEvent" in window)) {
+          throw new Error("DeviceOrientationEvent非対応");
+        }
+        const eventCtor = window.DeviceOrientationEvent;
+        if (typeof eventCtor.requestPermission === "function") {
+          const result = await eventCtor.requestPermission();
+          if (result !== "granted") throw new Error("センサー権限が拒否されました");
+        }
+      }
+
+      function attachOrientation() {
+        detachOrientation();
+        app.orientationHandler = (event) => {
+          if (app.simulation) return;
+          const value = app.axis === "beta" ? event.beta : event.gamma;
+          if (value == null) {
+            setSensorStatus("選択軸の値が未取得です");
+            return;
+          }
+          setSensorStatus("取得中");
+          ingestAngle(value);
+        };
+        window.addEventListener("deviceorientation", app.orientationHandler, true);
+      }
+
+      function detachOrientation() {
+        if (app.orientationHandler) {
+          window.removeEventListener("deviceorientation", app.orientationHandler, true);
+          app.orientationHandler = null;
+        }
+      }
+
+      async function unlockAudio() {
+        await ensureAudioContext();
+        playTone(CONFIG.TARGET_HZ, CONFIG.SILENT_UNLOCK_MS, "sine", 0.0002);
+      }
+
+      async function start() {
+        try {
+          app.axis = selectedAxis();
+          await unlockAudio();
+          clearAudioLoop();
+          app.running = true;
+          app.signalLost = false;
+          app.lastValueAt = performance.now();
+
+          if (!app.simulation) {
+            await requestOrientationPermission();
+            attachOrientation();
+            setSensorStatus("センサー待機中");
+            if (app.filteredAngle == null) markSignalLost("センサー値待機中");
+          } else {
+            detachOrientation();
+            setSensorStatus("シミュレーション中");
+            ingestAngle(Number.parseFloat(els.simulationSlider.value));
+          }
+
+          updateDerived();
+          startMonitor();
+          startAudioLoop();
+          render();
+        } catch (error) {
+          const message = error && error.message ? error.message : "開始できません";
+          stop();
+          setSensorStatus(message);
+          render();
+        }
+      }
+
+      function stop() {
+        app.running = false;
+        app.signalLost = false;
+        app.state = "stopped";
+        app.targetEnteredAt = null;
+        app.inTargetTone = false;
+        if (app.passTimer) {
+          clearTimeout(app.passTimer);
+          app.passTimer = null;
+        }
+        detachOrientation();
+        stopMonitor();
+        clearAudioLoop();
+        setSensorStatus("停止中");
+        render();
+      }
+
+      function setSimulation(enabled) {
+        app.simulation = enabled;
+        els.simulationSlider.disabled = !enabled;
+        els.lossButton.disabled = !enabled;
+        els.passButton.disabled = !enabled;
+        resetFiltering(enabled ? Number.parseFloat(els.simulationSlider.value) : null);
+        if (enabled) {
+          detachOrientation();
+          setSensorStatus("シミュレーション中");
+          if (app.running) ingestAngle(Number.parseFloat(els.simulationSlider.value));
+        } else {
+          setSensorStatus(app.running ? "センサー待機中" : "停止中");
+        }
+        render();
+      }
+
+      function runPassSimulation() {
+        if (!app.simulation) return;
+        if (app.passTimer) clearTimeout(app.passTimer);
+        const startValue = targetDeg() - 3;
+        const endValue = targetDeg() + 3;
+        const steps = 42;
+        let step = 0;
+        const tick = () => {
+          if (!app.simulation || step > steps) {
+            app.passTimer = null;
+            return;
+          }
+          const value = startValue + (endValue - startValue) * (step / steps);
+          els.simulationSlider.value = value.toFixed(1);
+          if (app.running) ingestAngle(value);
+          else render();
+          step += 1;
+          app.passTimer = setTimeout(tick, 80);
+        };
+        tick();
+      }
+
+      function registerServiceWorker() {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.register("./sw.js").catch(() => {
+            setSensorStatus("Service Worker登録に失敗しました");
+          });
+        }
+      }
+
+      document.querySelectorAll("input[name='axis']").forEach((input) => {
+        input.addEventListener("change", () => {
+          app.axis = selectedAxis();
+          resetFiltering(app.rawAngle);
+          updateDerived();
+          render();
+        });
+      });
+
+      els.targetInput.addEventListener("input", () => {
+        updateDerived();
+        render();
+      });
+
+      els.toleranceInput.addEventListener("input", () => {
+        updateDerived();
+        render();
+      });
+
+      els.startButton.addEventListener("click", start);
+      els.zeroButton.addEventListener("click", setZero);
+      els.stopButton.addEventListener("click", stop);
+
+      els.simulationToggle.addEventListener("change", () => setSimulation(els.simulationToggle.checked));
+      els.simulationSlider.addEventListener("input", () => {
+        const value = Number.parseFloat(els.simulationSlider.value);
+        els.simulationValue.textContent = `${value.toFixed(1)} deg`;
+        if (app.simulation && app.running) ingestAngle(value);
+      });
+      els.passButton.addEventListener("click", runPassSimulation);
+      els.lossButton.addEventListener("click", () => {
+        if (!app.simulation || !app.running) return;
+        markSignalLost("シミュレーション信号喪失");
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) stop();
+      });
+
+      window.addEventListener("pagehide", stop);
+
+      els.targetInput.value = CONFIG.DEFAULT_TARGET_DEG.toFixed(1);
+      els.toleranceInput.value = CONFIG.DEFAULT_TOLERANCE_DEG.toFixed(1);
+      registerServiceWorker();
+      render();
+    </script>
+  </body>
+</html>
