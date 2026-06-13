@@ -309,6 +309,25 @@
       .debug dt, .debug dd { margin: 0; }
       .debug dd { font-size: 1rem; }
 
+      .log-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 0;
+        min-width: 180px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 280px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+        color: #14211d;
+        font: 0.82rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        resize: vertical;
+      }
+
       @media (min-width: 560px) {
         .button-row { grid-template-columns: 1.35fr 1fr 0.7fr; }
         .button-row.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -319,7 +338,7 @@
     <main class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Tilt Audio PWA v005</p>
+          <p class="eyebrow">Tilt Audio PWA v008</p>
           <h1>傾き音声ガイド</h1>
         </div>
         <div id="runBadge" class="run-badge">停止中</div>
@@ -369,6 +388,7 @@
         <div class="button-row">
           <button id="startButton" type="button" class="primary">センサーと音を開始</button>
           <button id="zeroButton" type="button">現在角を0°に設定</button>
+                    <button id="audioTestButton" type="button">音テスト</button>
           <button id="stopButton" type="button" class="danger">停止</button>
         </div>
       </section>
@@ -402,13 +422,23 @@
           <div><dt>センサー</dt><dd id="sensorStatus">停止中</dd></div>
         </dl>
       </section>
+      <section class="debug" aria-label="ログ">
+        <div class="section-heading">
+          <h2>ログ</h2>
+          <div class="button-row compact log-actions">
+            <button id="copyLogButton" type="button">コピー</button>
+            <button id="clearLogButton" type="button">クリア</button>
+          </div>
+        </div>
+        <textarea id="logOutput" rows="8" readonly placeholder="開始すると自動でログを記録します"></textarea>
+      </section>
     </main>
 
     <script>
       "use strict";
 
       const CONFIG = {
-        APP_VERSION: "v005",
+        APP_VERSION: "v008",
         LOW_SIDE_HZ: 450,
         HIGH_SIDE_HZ: 1050,
         TARGET_HZ: 750,
@@ -424,7 +454,11 @@
         SENSOR_TIMEOUT_MS: 600,
         TARGET_EXIT_EXTRA_DEG: 0.18,
         SMOOTHING_ALPHA: 0.34,
-        SILENT_UNLOCK_MS: 35
+        SILENT_UNLOCK_MS: 35,
+        MASTER_GAIN: 0.75,
+        BEEP_GAIN: 0.28,
+        TARGET_GAIN: 0.16,
+        WARNING_GAIN: 0.28
       };
 
       const els = {
@@ -438,6 +472,7 @@
         toleranceInput: document.getElementById("toleranceInput"),
         startButton: document.getElementById("startButton"),
         zeroButton: document.getElementById("zeroButton"),
+                audioTestButton: document.getElementById("audioTestButton"),
         stopButton: document.getElementById("stopButton"),
         simulationToggle: document.getElementById("simulationToggle"),
         simulationSlider: document.getElementById("simulationSlider"),
@@ -448,7 +483,10 @@
         filteredAngle: document.getElementById("filteredAngle"),
         debugRelative: document.getElementById("debugRelative"),
         debugError: document.getElementById("debugError"),
-        sensorStatus: document.getElementById("sensorStatus")
+        sensorStatus: document.getElementById("sensorStatus"),
+        logOutput: document.getElementById("logOutput"),
+        copyLogButton: document.getElementById("copyLogButton"),
+        clearLogButton: document.getElementById("clearLogButton")
       };
 
       const app = {
@@ -468,6 +506,8 @@
         orientationHandler: null,
         monitorTimer: null,
         passTimer: null,
+        log: [],
+        lastLogAt: 0,
         audio: {
           ctx: null,
           master: null,
@@ -507,6 +547,55 @@
         els.sensorStatus.textContent = text;
       }
 
+      function logEvent(type, detail = {}) {
+        const row = {
+          t: new Date().toISOString(),
+          type,
+          state: app.state,
+          axis: app.axis,
+          raw: app.rawAngle == null ? null : Number(app.rawAngle.toFixed(3)),
+          filtered: app.filteredAngle == null ? null : Number(app.filteredAngle.toFixed(3)),
+          relative: app.relativeAngle == null ? null : Number(app.relativeAngle.toFixed(3)),
+          target: Number(targetDeg().toFixed(3)),
+          tolerance: Number(toleranceDeg().toFixed(3)),
+          error: app.error == null ? null : Number(app.error.toFixed(3)),
+          audioState: app.audio.ctx ? app.audio.ctx.state : "none",
+          ...detail
+        };
+        app.log.push(row);
+        if (els.logOutput) {
+          els.logOutput.value = app.log.map((item) => JSON.stringify(item)).join("\n");
+          els.logOutput.scrollTop = els.logOutput.scrollHeight;
+        }
+      }
+
+      function logAngleSample(now = performance.now()) {
+        if (!app.running) return;
+        if (now - app.lastLogAt < 200) return;
+        app.lastLogAt = now;
+        logEvent("angle");
+      }
+
+      async function copyLog() {
+        const text = app.log.map((item) => JSON.stringify(item)).join("\n");
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          setSensorStatus("ログをコピーしました");
+        } catch (_) {
+          els.logOutput.focus();
+          els.logOutput.select();
+          setSensorStatus("ログ欄を選択しました");
+        }
+      }
+
+      function clearLog() {
+        app.log = [];
+        app.lastLogAt = 0;
+        if (els.logOutput) els.logOutput.value = "";
+        setSensorStatus("ログをクリアしました");
+      }
+
       function resetFiltering(raw = null) {
         app.rawAngle = raw;
         app.filteredAngle = raw;
@@ -522,6 +611,7 @@
           return;
         }
         app.zeroAngle = app.filteredAngle;
+        logEvent("zero");
         app.targetEnteredAt = null;
         app.inTargetTone = false;
         updateDerived(performance.now());
@@ -629,7 +719,7 @@
           if (!AudioCtor) throw new Error("Web Audio APIが使えません");
           app.audio.ctx = new AudioCtor();
           app.audio.master = app.audio.ctx.createGain();
-          app.audio.master.gain.value = 0.16;
+          app.audio.master.gain.value = CONFIG.MASTER_GAIN;
           app.audio.master.connect(app.audio.ctx.destination);
         }
         await app.audio.ctx.resume();
@@ -680,7 +770,7 @@
         osc.type = "triangle";
         osc.frequency.setValueAtTime(CONFIG.TARGET_HZ, now);
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.08);
+        gain.gain.exponentialRampToValueAtTime(CONFIG.TARGET_GAIN, now + 0.08);
         osc.connect(gain);
         gain.connect(app.audio.master);
         osc.start(now);
@@ -708,15 +798,15 @@
         stopOscillators();
 
         if (app.state === "lost") {
-          playTone(CONFIG.WARNING_HZ, 90, "square", 0.12);
-          window.setTimeout(() => playTone(CONFIG.WARNING_SECOND_HZ, 70, "square", 0.1), 115);
+          playTone(CONFIG.WARNING_HZ, 110, "square", CONFIG.WARNING_GAIN);
+          window.setTimeout(() => playTone(CONFIG.WARNING_SECOND_HZ, 90, "square", CONFIG.WARNING_GAIN), 115);
           scheduleAudioLoop(900);
           return;
         }
 
         if (app.state === "minus" || app.state === "plus") {
           const hz = app.state === "minus" ? CONFIG.LOW_SIDE_HZ : CONFIG.HIGH_SIDE_HZ;
-          playTone(hz, CONFIG.BEEP_DURATION_MS, "sine", 0.16);
+          playTone(hz, CONFIG.BEEP_DURATION_MS, "sine", CONFIG.BEEP_GAIN);
           scheduleAudioLoop(beepIntervalMs(Math.abs(app.error || 0)));
           return;
         }
@@ -790,7 +880,21 @@
 
       async function unlockAudio() {
         await ensureAudioContext();
-        playTone(CONFIG.TARGET_HZ, CONFIG.SILENT_UNLOCK_MS, "sine", 0.0002);
+        playTone(CONFIG.TARGET_HZ, CONFIG.SILENT_UNLOCK_MS, "sine", 0.02);
+      }
+
+      async function runAudioTest() {
+        try {
+          await ensureAudioContext();
+          clearAudioLoop();
+          setSensorStatus("音テスト中");
+          logEvent("audio-test");
+          playTone(CONFIG.LOW_SIDE_HZ, 160, "sine", CONFIG.BEEP_GAIN);
+          window.setTimeout(() => playTone(CONFIG.HIGH_SIDE_HZ, 160, "sine", CONFIG.BEEP_GAIN), 260);
+          window.setTimeout(() => playTone(CONFIG.TARGET_HZ, 420, "triangle", CONFIG.TARGET_GAIN), 540);
+        } catch (error) {
+          setSensorStatus(error && error.message ? error.message : "音テスト失敗");
+        }
       }
 
       async function start() {
@@ -800,11 +904,15 @@
           app.running = true;
           app.signalLost = false;
           app.lastValueAt = performance.now();
+          app.log = [];
+          app.lastLogAt = 0;
+          if (els.logOutput) els.logOutput.value = "";
+          logEvent("start-tap");
 
-          const permissionPromise = app.simulation ? Promise.resolve() : requestOrientationPermission();
           const audioPromise = unlockAudio();
-          await permissionPromise;
+          const permissionPromise = app.simulation ? Promise.resolve() : requestOrientationPermission();
           await audioPromise;
+          await permissionPromise;
 
           if (!app.simulation) {
             attachOrientation();
@@ -936,6 +1044,9 @@
 
       els.startButton.addEventListener("click", start);
       els.zeroButton.addEventListener("click", setZero);
+            els.audioTestButton.addEventListener("click", runAudioTest);
+      els.copyLogButton.addEventListener("click", copyLog);
+      els.clearLogButton.addEventListener("click", clearLog);
       els.stopButton.addEventListener("click", stop);
 
       els.simulationToggle.addEventListener("change", () => setSimulation(els.simulationToggle.checked));
@@ -963,6 +1074,12 @@
     </script>
   </body>
 </html>
+
+
+
+
+
+
 
 
 

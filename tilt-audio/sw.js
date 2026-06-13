@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "tilt-audio-pwa-v5";
+const CACHE_NAME = "tilt-audio-pwa-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -56,4 +56,7 @@ self.addEventListener("fetch", (event) => {
     }).catch(() => caches.match(event.request))
   );
 });
+
+
+
 
